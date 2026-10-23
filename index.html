@@ -107,6 +107,16 @@ body.rm *{transition:none!important;animation:none!important}body.rm .stack,body
 #mnav{display:none}body[data-mode=study] #mnav{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;margin:0 auto 10px;max-width:680px}
 #mnav input{width:64px;min-height:38px;font-size:14px}#mnav select{max-width:150px}
 #dgo{white-space:pre-wrap;font-size:12px;color:var(--mut)}
+
+#hc,#hn{display:none!important}
+body.v-trf .c.cur,body.v-trf .c.amb{display:flex;flex-direction:column}
+body.v-trf .c .ref{order:-2}body.v-trf .c .tr{order:-1;font-size:calc(var(--fs,38px)*.62);line-height:1.45;margin:6px 0 10px}body.v-trf .c .ar{order:0;font-size:calc(var(--fs,38px)*.62)}
+body.v-trf .c.nx2 .tr{font-size:calc(var(--fs,38px)*.4)}
+#advd summary{cursor:pointer;color:var(--acc);margin:14px 0 4px}
+#fr{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
+#fr h2{margin:0 0 4px;font-size:22px}#fr p{margin:0 0 10px;color:var(--mut);max-width:420px}
+#fr .g{display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));gap:10px;width:min(100%,420px)}
+#fr button{min-height:52px;font-size:17px}
 </style>
 </head>
 <body>
@@ -179,8 +189,7 @@ function feed(t){
   const top=L[0],sn=new Set(),con=[];
   for(const h of L){const k=W[h.e].k;if(!sn.has(k)&&h.sc>=top.sc-.25){sn.add(k);con.push(h)}}
   if(con.length>1&&!prayer)renderAmb(con.slice(0,3).map(h=>({e:h.e,k:W[h.e].k})));else render(top.e);
-  const lab={exp:'✓ suite attendue confirmée',glob:'↻ verset retrouvé par recherche',hold:'… écoute',pin:'📌 choix manuel'}[S.f];
-  $('st').textContent=(prayer?'Rakʿa '+(S.rak||'—')+' · ':'')+lab+(con.length>1&&!prayer?' · ambigu':'')+(con.length===1&&esurah(top.e)?' · fin de sourate : nouvelle sourate attendue':'')+' · ⚡ '+(performance.now()-t0).toFixed(1)+' ms';
+  $('st').textContent=(prayer&&S.rak?'Rakʿa '+S.rak:'')+(con.length===1&&esurah(top.e)?(prayer&&S.rak?' · ':'')+'fin de sourate':'');
 }
 // ---- Données vérifiées : chargement des fichiers fournis (format Tanzil : sourate|verset|texte) ----
 let SRC={};const SN=["Al-Fātiḥa", "Al-Baqara", "Āl ʿImrān", "An-Nisāʾ", "Al-Māʾida", "Al-Anʿām", "Al-Aʿrāf", "Al-Anfāl", "At-Tawba", "Yūnus", "Hūd", "Yūsuf", "Ar-Raʿd", "Ibrāhīm", "Al-Ḥijr", "An-Naḥl", "Al-Isrāʾ", "Al-Kahf", "Maryam", "Ṭā-Hā", "Al-Anbiyāʾ", "Al-Ḥajj", "Al-Muʾminūn", "An-Nūr", "Al-Furqān", "Ash-Shuʿarāʾ", "An-Naml", "Al-Qaṣaṣ", "Al-ʿAnkabūt", "Ar-Rūm", "Luqmān", "As-Sajda", "Al-Aḥzāb", "Sabaʾ", "Fāṭir", "Yā-Sīn", "Aṣ-Ṣāffāt", "Ṣād", "Az-Zumar", "Ghāfir", "Fuṣṣilat", "Ash-Shūrā", "Az-Zukhruf", "Ad-Dukhān", "Al-Jāthiya", "Al-Aḥqāf", "Muḥammad", "Al-Fatḥ", "Al-Ḥujurāt", "Qāf", "Adh-Dhāriyāt", "Aṭ-Ṭūr", "An-Najm", "Al-Qamar", "Ar-Raḥmān", "Al-Wāqiʿa", "Al-Ḥadīd", "Al-Mujādila", "Al-Ḥashr", "Al-Mumtaḥana", "Aṣ-Ṣaff", "Al-Jumuʿa", "Al-Munāfiqūn", "At-Taghābun", "Aṭ-Ṭalāq", "At-Taḥrīm", "Al-Mulk", "Al-Qalam", "Al-Ḥāqqa", "Al-Maʿārij", "Nūḥ", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyāma", "Al-Insān", "Al-Mursalāt", "An-Nabaʾ", "An-Nāziʿāt", "ʿAbasa", "At-Takwīr", "Al-Infiṭār", "Al-Muṭaffifīn", "Al-Inshiqāq", "Al-Burūj", "Aṭ-Ṭāriq", "Al-Aʿlā", "Al-Ghāshiya", "Al-Fajr", "Al-Balad", "Ash-Shams", "Al-Layl", "Aḍ-Ḍuḥā", "Ash-Sharḥ", "At-Tīn", "Al-ʿAlaq", "Al-Qadr", "Al-Bayyina", "Az-Zalzala", "Al-ʿĀdiyāt", "Al-Qāriʿa", "At-Takāthur", "Al-ʿAṣr", "Al-Humaza", "Al-Fīl", "Quraysh", "Al-Māʿūn", "Al-Kawthar", "Al-Kāfirūn", "An-Naṣr", "Al-Masad", "Al-Ikhlāṣ", "Al-Falaq", "An-Nās"],NM={};SN.forEach((nm,i)=>NM[i+1]=nm);
@@ -212,16 +221,16 @@ const meta=t=>{const m={};for(const l of String(t).split('\n')){const r=/^#\s*(N
 const esc2=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function apply(T){
   if(!T.ar){$('ds').textContent='Il faut au moins le texte arabe (quran-uthmani.txt).';return}
-  const tr=T.tr||{},trs={};for(const[id,o]of Object.entries(tr))trs[id]=parse(o.txt);
+  const tr=T.tr||{},trs={},lc={};for(const[id,o]of Object.entries(tr)){trs[id]=parse(o.txt);const l=id.split(/[._-]/)[0];lc[l]=(lc[l]||0)+1}
   const err=load(parse(T.ar),trs);
   if(err){$('ds').textContent='✗ '+err;return}
   SRC={};const sel=$('lang'),cur=sel.value;sel.innerHTML='';let rows='';
   for(const id of Object.keys(tr)){const p=id.split(/[._-]/),mt=meta(tr[id].txt),o=document.createElement('option');
-    o.value=id;o.textContent=(LN[p[0]]||mt.Language||p[0].toUpperCase())+' · '+(mt.Translator||mt.Name||p.slice(1).join(' '));sel.appendChild(o);
+    o.value=id;o.textContent=(LN[p[0]]||mt.Language||p[0].toUpperCase())+(lc[p[0]]>1?' · '+(mt.Translator||mt.Name||p.slice(1).join(' ')):'');sel.appendChild(o);
     SRC[id]=(mt.Translator||mt.Name||id)+' — Tanzil.net';
     rows+='<li>'+esc2(o.textContent)+(mt['Last Update']?' <small>('+esc2(mt['Last Update'])+')</small>':'')+(trs[id].size!==6236?' ⚠ incomplète '+trs[id].size+'/6236':'')+'</li>'}
   const o0=document.createElement('option');o0.value='';o0.textContent='Sans traduction';sel.appendChild(o0);
-  sel.value=[...sel.options].some(x=>x.value===cur)?cur:(Object.keys(tr)[0]||'');
+  const sv=(()=>{try{return localStorage.getItem('lang')}catch(e){return null}})();sel.value=[...sel.options].some(x=>x.value===sv)?sv:([...sel.options].some(x=>x.value===cur)?cur:(Object.keys(tr)[0]||''));
   $('ds').textContent='✓ Coran complet : 6236 versets (114 sourates) · '+Object.keys(tr).length+' traduction(s) · empreinte '+fnv(V.map(v=>v.w.map(norm).join(' ')).join('|'));
   const box=document.getElementById('src');
   if(box)box.innerHTML='<p><b>Texte arabe :</b> Tanzil Quran Text (Uthmani), © Tanzil Project, licence CC BY 3.0, texte non modifié. Source : <a href="https://tanzil.net" target="_blank" rel="noopener">tanzil.net</a></p><p><b>Traductions (Tanzil.net, usage non commercial) :</b></p><ul>'+rows+'</ul><details><summary>Mentions de copyright du texte arabe</summary><pre>'+esc2(String(T.ar).split('\n').filter(l=>l.startsWith('#')).join('\n'))+'</pre></details>';
@@ -272,7 +281,7 @@ function wireWK(){
     if(d.prog&&d.prog.status==='progress')$('st').textContent='Téléchargement du modèle (une seule fois)… '+Math.round(d.prog.progress||0)+' %';
     if(d.ready){ready=true;$('st').textContent='Modèle prêt : récitez.'}
     if(d.err){busy=false;$('st').textContent='Erreur Whisper : '+d.err}
-    if(d.text!==undefined){busy=false;addWin(d.text);$('st').textContent+=' · Whisper '+Math.round(performance.now()-tw)+' ms'}};
+    if(d.text!==undefined){busy=false;addWin(d.text);void 0}};
   wk.postMessage({init:1});
 }
 async function startMic(){
@@ -427,30 +436,47 @@ try{(function(){
 const LS={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const Q=s=>document.querySelector(s);
 let M='salah',pe=-1,sk=-1;const skp=new Set(),done=new Set();let HZ={};try{HZ=JSON.parse(LS.g('hz')||'{}')}catch(e){}
-const MSG={salah:'Mode Prière : suivez l’imam. Appuyez sur Écouter.',study:'Mode Étude : récitez ou naviguez avec ◀ ▶.',hifz:'Mode Hifz : récitez de mémoire ; la suite peut être masquée.',trad:'Traduction en direct : khutbah, cours, discussions. Appuyez sur Écouter.'};
-document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Traduction</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe + traduction</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance vocale</h4><select id="eng"><option value="browser">Navigateur (en ligne, plus fiable)</option><option value="whisper">Hors ligne (Whisper, bêta)</option></select><h4>Tradition de récitation</h4><select id="rw"><option>Hafs ʿan ʿĀṣim</option><option disabled>Warsh ʿan Nāfiʿ (à venir)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div>');
+const MSG={salah:'Appuyez sur Écouter. La traduction du verset récité s’affiche ici, avec la suite attendue en dessous.',study:'Choisissez une sourate, un verset, un juz ou une page ci-dessus, ou récitez pour que l’application vous suive.',hifz:'Récitez de mémoire. La suite est masquée tant que vous ne la révélez pas.',trad:'Khutbah, cours, discussions : traduction de la parole en direct. Nécessite internet, ou le traducteur intégré de Chrome. Pour la prière, utilisez l’onglet Prière.'};
+document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="trf">Traduction en grand (recommandé)</option><option value="both">Arabe en grand + traduction</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
 Q('#tl').append($('lang'));Q('#d1').append($('fs').parentElement);Q('#d2').append(ld);
 const bar3=Q('#bar3');bar3.append($('wb'));
 // --- moteur de reconnaissance : navigateur (en ligne) ou Whisper (hors ligne) ---
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,srOn=false,rs=0;
-const eng=$('eng');if(!SR){eng.value='whisper';eng.querySelector('option').remove&&eng.querySelector('option').remove()}else eng.value=LS.g('eng')||'browser';
+const eng=$('eng');eng.value=LS.g('eng')||'auto';if(!['auto','local','browser','whisper'].includes(eng.value))eng.value='auto';
+if(!SR)[...eng.options].forEach(o=>{if(o.value==='local'||o.value==='browser')o.remove()});
+let LOC=null;
+async function localOK(){
+  if(LOC!==null)return LOC==='ok';
+  try{if(SR&&SR.available){const o={langs:['ar-SA'],processLocally:true};let r=await SR.available(o);
+      if(r==='downloadable'||r==='downloading'){$('st').textContent='Téléchargement de la langue arabe pour la reconnaissance locale (une seule fois)…';const ok=await SR.install(o);r=ok===false?'unavailable':'available'}
+      LOC=r==='available'?'ok':'no'}else LOC='no'}catch(e){LOC='no'}
+  return LOC==='ok'}
+async function pickEngine(){const v=eng.value;
+  if(v==='whisper')return'whisper';
+  if(v==='local')return(await localOK())?'local':(SR?'browser':'whisper');
+  if(v==='browser')return SR?'browser':'whisper';
+  if(SR&&await localOK())return'local';
+  if(SR&&navigator.onLine)return'browser';
+  return'whisper'}
+function setEngs(e){const t={local:['sur l’appareil','🔒 Reconnaissance sur l’appareil : fonctionne sans internet, aucun son n’est envoyé.'],browser:['en ligne','🌐 Reconnaissance en ligne : le son est envoyé au service de reconnaissance du navigateur.'],whisper:['Whisper hors ligne','🔒 Reconnaissance hors ligne (Whisper) : aucun son envoyé. Le premier lancement télécharge le modèle.']}[e];
+  window.__eg=t[0];$('engs').textContent=t[1];if(window.__paint)window.__paint()}
 eng.onchange=()=>LS.s('eng',eng.value);
-function srToggle(){
+function srToggle(loc){
   const b=$('wb');
   if(srOn){srOn=false;try{rec.stop()}catch(e){}b.textContent='🎙 Écouter';b.classList.remove('rec');return}
-  rec=new SR();rec.lang='ar-SA';rec.continuous=true;rec.interimResults=true;let fin=0;if(M==='trad'&&window.__tradWarm)window.__tradWarm();
+  rec=new SR();rec.lang='ar-SA';rec.continuous=true;rec.interimResults=true;if(loc)rec.processLocally=true;let fin=0;if(M==='trad'&&window.__tradWarm)window.__tradWarm();
   rec.onresult=e=>{
     if(M==='trad'){for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];window.__tradLive(rs+'_'+i,r[0].transcript.trim(),r.isFinal)}return}
     let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+' ';feed(t.trim())};
-  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){srOn=false;b.textContent='🎙 Écouter';b.classList.remove('rec');$('st').textContent='Micro bloqué : autorisez le micro pour cette page (ou ouvrez-la directement dans Chrome en HTTPS).'}else if(e.error!=='no-speech')$('st').textContent='Erreur micro : '+e.error};
+  rec.onerror=e=>{if(loc&&(e.error==='language-not-supported'||e.error==='service-not-allowed')){LOC='no';srOn=false;b.textContent='🎙 Écouter';b.classList.remove('rec');$('st').textContent='Reconnaissance locale indisponible sur cet appareil : réessayez (le mode en ligne ou Whisper sera utilisé).';return}if(e.error==='not-allowed'||e.error==='service-not-allowed'){srOn=false;b.textContent='🎙 Écouter';b.classList.remove('rec');$('st').textContent='Micro bloqué : autorisez le micro pour cette page (ou ouvrez-la directement dans Chrome en HTTPS).'}else if(e.error!=='no-speech')$('st').textContent='Erreur micro : '+e.error};
   rec.onend=()=>{fin=0;rs++;if(srOn)try{rec.start()}catch(e){}};
   srOn=true;b.textContent='⏹ Arrêter';b.classList.add('rec');try{rec.start()}catch(e){}}
-$('wb').onclick=()=>(SR&&eng.value==='browser')?srToggle():whisperToggle();
+$('wb').onclick=async()=>{if(srOn){srToggle();return}if(wOn){whisperToggle();return}const e=await pickEngine();setEngs(e);if(e==='whisper')whisperToggle();else srToggle(e==='local')};
 ab.textContent='👓 AR';bar3.append(ab);
 const dc=document.createElement('button');dc.textContent='◐ Discret';dc.onclick=()=>document.body.classList.add('glass');bar3.append(dc);
 const gr=document.createElement('button');gr.textContent='⚙';gr.setAttribute('aria-label','Réglages');gr.onclick=()=>Q('#dr2').classList.toggle('o');bar3.append(gr);
 $('dx2').onclick=()=>Q('#dr2').classList.remove('o');
-const vw=$('vw');vw.value=LS.g('vw')||'both';const av=()=>{document.body.classList.toggle('v-tr',vw.value==='tr');document.body.classList.toggle('v-ar',vw.value==='ar')};vw.onchange=()=>{LS.s('vw',vw.value);av()};av();
+const vw=$('vw');vw.value=LS.g('vw')||'trf';const av=()=>{document.body.classList.toggle('v-tr',vw.value==='tr');document.body.classList.toggle('v-ar',vw.value==='ar');document.body.classList.toggle('v-trf',vw.value==='trf')};vw.onchange=()=>{LS.s('vw',vw.value);av()};av();
 function setM(m){
   M=m;document.body.dataset.mode=m;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
   prayer=(m==='salah');acc=[];words=[];last=-1;snaps=[{H:[],rak:0,miss:0,f:'hold'}];arS=null;pe=-1;sk=-1;skp.clear();
@@ -489,7 +515,7 @@ const ES=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','
 // 1) états de suivi (FR-SR-01)
 const SD={IDLE:['#6b7a76','Inactif'],LISTENING:['#4aa3e8','Écoute'],MATCHED:['#2fbf8f','Position confirmée'],UNCERTAIN:['#e0a526','Incertain'],PAUSED:['#9aa7a3','En pause (position conservée)'],RECOVERING:['#e07a26','Recherche de la position…'],ERROR:['#e05252','Erreur']};
 document.body.insertAdjacentHTML('beforeend','<div class="ts" id="ts" role="status" aria-live="polite"><i></i><span></span></div>');
-function paint(){const b=$('ts');if(!b)return;const d=SD[state];b.querySelector('i').style.background=d[0];b.querySelector('span').textContent=d[1];b.dataset.s=state}
+window.__paint=()=>paint();function paint(){const b=$('ts');if(!b)return;const d=SD[state];b.querySelector('i').style.background=d[0];b.querySelector('span').textContent=d[1]+(window.__eg?' · '+window.__eg:'');b.dataset.s=state}
 function log(o){if(cur&&cur.events.length<400)cur.events.push(o)}
 function setS(s){if(s===state)return;const p=state;state=s;paint();log({t:Date.now(),ev:'state',from:p,to:s});if(cur){if(s==='UNCERTAIN')cur.amb++;if(s==='RECOVERING')cur.rec++;if(p==='RECOVERING'&&s==='MATCHED')log({t:Date.now(),ev:'recovered'})}}
 const _r=render;render=function(e){_r(e);const w=W[e],v=V[w.k],now=Date.now();
@@ -520,7 +546,7 @@ const _ap=apply;apply=function(T){_ap(T);try{
   box.insertAdjacentHTML('beforeend','<h4>Registre des contenus</h4><table id="reg"><tr><th>ID</th><th>Type</th><th>Source / édition</th><th>Empreinte</th><th>Complétude</th><th>Licence</th></tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+ES(c)+'</td>').join('')+'</tr>').join('')+'</table><div class="gate '+(bad?'bad':'ok')+'">'+(bad?'✗ Publication commerciale bloquée : '+bad+' traduction(s) sans autorisation commerciale documentée (statuts NON_COMMERCIAL_ONLY / UNKNOWN). Usage personnel et essais uniquement.':'✓ Tous les contenus sont approuvés pour l’usage prévu.')+'</div>')}catch(e){console.error('registre',e)}};
 if(typeof EMB!=='undefined'&&EMB&&V.length===6236){try{apply({ar:EMB.ar,tr:EMB.tr})}catch(e){}}
 // 4) historique, reprise, export, suppression ; animations réduites
-const dr=Q('#dr2');
+const dr=Q('#adv')||Q('#dr2');
 if(dr)dr.insertAdjacentHTML('beforeend','<h4>Historique (sur cet appareil)</h4><div id="sh"></div><h4>Accessibilité</h4><label><input type="checkbox" id="rm"> Réduire les animations (recommandé en prière)</label>');
 let armed=false;
 function rl(){const sh=$('sh');if(!sh)return;
@@ -583,8 +609,20 @@ const dg=$('dg');if(dg)dg.onclick=async()=>{const o=$('dgo'),out=[];const T=asyn
   await T('Micro',async()=>{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(x=>x.stop())});
   await T('Modèles déjà en cache (hors ligne possible)',async()=>{const k=await caches.keys();return k.length?k.join(', '):'aucun : le premier lancement doit se faire en ligne'});
   out.push('\nEnvoyez-moi ce texte si un point est ✗.');o.textContent=out.join('\n')};
-const dr=Q('#dr2');if(dr)dr.insertAdjacentHTML('beforeend','<p><small>Numéros de page et de juz : métadonnées AlQuran Cloud (pagination de Médine, 604 pages), utilisés pour la navigation uniquement ; le texte vient de Tanzil.</small></p>');
+const dr=Q('#adv')||Q('#dr2');if(dr)dr.insertAdjacentHTML('beforeend','<p><small>Numéros de page et de juz : métadonnées AlQuran Cloud (pagination de Médine, 604 pages), utilisés pour la navigation uniquement ; le texte vient de Tanzil.</small></p>');
 })()}catch(e){console.error('mushaf',e)}
+
+// ---- Première ouverture : langue de traduction ----
+try{(function(){
+const L={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+$('lang').addEventListener('change',()=>L.s('lang',$('lang').value));
+const _ap2=apply;apply=function(T){_ap2(T);try{
+  if(L.g('lang_set')||document.getElementById('fr'))return;
+  const opts=[...$('lang').options].filter(o=>o.value);if(!opts.length)return;
+  document.body.insertAdjacentHTML('beforeend','<div id="fr"><h2>بصيرة Basirah</h2><p>Dans quelle langue voulez-vous lire la traduction du Coran ? Vous pourrez la changer à tout moment en haut à droite.</p><div class="g">'+opts.map(o=>'<button data-v="'+o.value+'">'+o.textContent+'</button>').join('')+'</div></div>');
+  const box=document.getElementById('fr');if(!box||!box.querySelectorAll)return;
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{$('lang').value=b.dataset.v;L.s('lang',b.dataset.v);L.s('lang_set','1');if($('lang').onchange)$('lang').onchange();box.remove()})}catch(e){console.error('première ouverture',e)}};
+})()}catch(e){console.error('langue',e)}
 </script>
 </body>
 </html>
