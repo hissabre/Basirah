@@ -200,7 +200,7 @@ W.forEach((w,i)=>{w.s=sk(w.t);(U.get(w.s)||U.set(w.s,[]).get(w.s)).push(i);if(w.
 let FE=W.findIndex((w,i)=>V[w.k].n===1&&(!W[i+1]||V[W[i+1].k].n!==1)),B1=W.findIndex((w,i)=>w.k===0&&W[i+1].k!==0);
 const esurah=e=>!W[e+1]||V[W[e+1].k].n!==V[W[e].k].n;
 let prayer=false,words=[],snaps=[{H:[],rak:0,miss:0,f:'hold'}];
-function ex(e){if(e<0)return ST;const r=[e+1,e+2];if(esurah(e)||e===B1)r.push(...ST);return r.filter(p=>p<W.length)}
+function ex(e){if(e<0)return ST;const r=[e+1,e+2,e+3,e+4];if(esurah(e)||e===B1)r.push(...ST);return r.filter(p=>p<W.length)}
 function glob(ws,H){
   const n=ws.length,cs=new Set(),th=n<2?.95:n<3?.78:.66,out={};
   for(let i=0;i<n;i++){const u=U.get(sk(ws[i]));if(u&&u.length<300)u.forEach(p=>cs.add(p+(n-1-i)))}
@@ -210,7 +210,7 @@ function glob(ws,H){
 }
 function step(S,w,i){
   const x=w[i],src=S.H.length?S.H:[{e:-1,sc:0}],seen=new Map();let bs=0,f='exp';
-  for(const h of src)for(const e of ex(h.e)){const s=sim(x,W[e].t);if(s>=.55){bs=Math.max(bs,s);const sc=h.sc*.7+s+(e===h.e+1?(prayer?.3:.05):0)+(prayer&&e===0?.05:0);const o=seen.get(e);if(!o||sc>o.sc)seen.set(e,{e,sc})}}
+  for(const h of src)for(const e of ex(h.e)){const d=e-h.e,s=sim(x,W[e].t);if(s>=(d>=3&&d<=4?.75:.55)){bs=Math.max(bs,s);const sc=h.sc*.7+s+(d===1?(prayer?.3:.05):d>=2&&d<=4?-.1*(d-1):0)+(prayer&&e===0?.05:0);const o=seen.get(e);if(!o||sc>o.sc)seen.set(e,{e,sc})}}
   if(!seen.size||bs<.8){const G=glob(w.slice(Math.max(0,i-3),i+1),S.H);if(G.length){if(!seen.size)f='glob';G.forEach(g=>{const o=seen.get(g.e);if(!o||g.sc>o.sc)seen.set(g.e,{...g,src:'g'})})}}
   if(!seen.size)return{H:S.H,rak:S.rak,miss:S.miss+1,f:'hold'};
   const a0=S.H[0];
@@ -220,18 +220,75 @@ function step(S,w,i){
   return{H:L,rak:S.rak+(L[0].e===FE&&p!==FE?1:0),miss:0,f};
 }
 const GATE=2.7;
-function feed(t){
+function feedQ(t){
   const t0=performance.now(),w=norm(t).split(' ').filter(x=>x&&!STOP.has(x));
   let m=0;while(m<w.length&&m<words.length&&w[m]===words[m])m++;
   if(m===0&&words.length>3&&w.length<words.length/2){snaps=[snaps[snaps.length-1]]}
   words=w;snaps.length=m+1;
   let S=snaps[m];for(let i=m;i<w.length;i++){S=step(S,w,i);snaps.push(S)}
-  const L=S.H;if(!L.length){$('st').textContent=w.length?'… aucun verset reconnu':'';return}
+  const L=S.H;if(!L.length){$('st').textContent=w.length?'… aucun verset reconnu':'';return 0}
   const top=L[0],sn=new Set(),con=[];
-  if(top.sc<GATE&&S.f!=='pin'){$('st').textContent='';return}
+  if(top.sc<GATE&&S.f!=='pin'&&!(last>=0&&Math.abs(top.e-last)<=8&&top.sc>=GATE*.75&&W[top.e].k===W[last].k)){$('st').textContent='';return 0}
   for(const h of L){const k=W[h.e].k;if(!sn.has(k)&&h.sc>=top.sc-.25){sn.add(k);con.push(h)}}
   if(con.length>1&&!prayer)renderAmb(con.slice(0,3).map(h=>({e:h.e,k:W[h.e].k})));else render(top.e);
   $('st').textContent=(prayer&&S.rak?'Rakʿa '+S.rak:'')+(con.length===1&&esurah(top.e)?(prayer&&S.rak?' · ':'')+'fin de sourate':'');
+  return top.sc;
+}
+
+// ---- Formules de la prière (hors Coran) : textes arabes classiques fixes ; traductions rédigées pour l'app (Basirah), distinctes de Tanzil ----
+const PH=[
+{id:'takbir',nm:'Takbīr',ar:'اللَّهُ أَكْبَر',v:['الله اكبر'],fr:'Allah est le Plus Grand.',en:'Allah is the Greatest.'},
+{id:'tasmi',nm:'Taʿmīʿ (se relever)',ar:'سَمِعَ اللَّهُ لِمَنْ حَمِدَه',v:['سمع الله لمن حمده'],fr:'Allah entend celui qui Le loue.',en:'Allah hears the one who praises Him.'},
+{id:'tahmid',nm:'Taḥmīd',ar:'رَبَّنَا وَلَكَ الْحَمْد',v:['ربنا ولك الحمد','ربنا لك الحمد','اللهم ربنا ولك الحمد','اللهم ربنا لك الحمد'],fr:'Notre Seigneur, à Toi la louange.',en:'Our Lord, to You belongs all praise.'},
+{id:'ruku',nm:'Tasbīḥ du rukūʿ',ar:'سُبْحَانَ رَبِّيَ الْعَظِيم',v:['سبحان ربي العظيم'],fr:'Gloire à mon Seigneur, le Très Grand.',en:'Glory be to my Lord, the Almighty.'},
+{id:'sujud',nm:'Tasbīḥ de la prosternation',ar:'سُبْحَانَ رَبِّيَ الْأَعْلَى',v:['سبحان ربي الاعلي'],fr:'Gloire à mon Seigneur, le Très Haut.',en:'Glory be to my Lord, the Most High.'},
+{id:'jalsa',nm:'Entre les deux prosternations',ar:'رَبِّ اغْفِرْ لِي',v:['رب اغفر لي'],fr:'Seigneur, pardonne-moi.',en:'My Lord, forgive me.'},
+{id:'istiftah',nm:'Du‘ā’ d’ouverture',ar:'سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ وَتَبَارَكَ اسْمُكَ وَتَعَالَى جَدُّكَ وَلَا إِلَهَ غَيْرُكَ',fr:'Gloire à Toi, ô Allah, et louange à Toi. Béni soit Ton nom, élevée est Ta majesté, et il n’y a de divinité que Toi.',en:'Glory and praise to You, O Allah. Blessed is Your name, exalted is Your majesty, and there is no god but You.'},
+{id:'istiadha',nm:'Isti‘ādha',ar:'أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيم',fr:'Je cherche refuge auprès d’Allah contre Satan le maudit.',en:'I seek refuge in Allah from Satan, the accursed.'},
+{id:'tashahhud',nm:'Tashahhud',ar:'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ',fr:'Les salutations, les prières et les bonnes paroles sont pour Allah. Que la paix soit sur toi, ô Prophète, ainsi que la miséricorde d’Allah et Ses bénédictions. Que la paix soit sur nous et sur les pieux serviteurs d’Allah. J’atteste qu’il n’y a de divinité qu’Allah, et j’atteste que Muhammad est Son serviteur et Son messager.',en:'All greetings, prayers and good words are for Allah. Peace be upon you, O Prophet, and the mercy of Allah and His blessings. Peace be upon us and upon the righteous servants of Allah. I bear witness that there is no god but Allah, and I bear witness that Muhammad is His servant and messenger.'},
+{id:'salawat',nm:'Ṣalawāt sur le Prophète ﷺ',ar:'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ',fr:'Ô Allah, accorde Ta grâce à Muhammad et à la famille de Muhammad, comme Tu l’as accordée à Ibrahim et à la famille d’Ibrahim ; Tu es digne de louange et de gloire. Ô Allah, bénis Muhammad et la famille de Muhammad, comme Tu as béni Ibrahim et la famille d’Ibrahim ; Tu es digne de louange et de gloire.',en:'O Allah, send Your grace upon Muhammad and the family of Muhammad, as You sent it upon Ibrahim and the family of Ibrahim; You are Praiseworthy and Glorious. O Allah, bless Muhammad and the family of Muhammad, as You blessed Ibrahim and the family of Ibrahim; You are Praiseworthy and Glorious.'},
+{id:'salam',nm:'Salām (fin de prière)',ar:'السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ',v:['السلام عليكم ورحمه الله','السلام عليكم'],fr:'Que la paix et la miséricorde d’Allah soient sur vous.',en:'Peace and the mercy of Allah be upon you.'},
+{id:'istighfar',nm:'Istighfār',ar:'أَسْتَغْفِرُ اللَّه',v:['استغفر الله'],fr:'Je demande pardon à Allah.',en:'I seek forgiveness from Allah.'},
+{id:'subhan',nm:'Tasbīḥ',ar:'سُبْحَانَ اللَّه',v:['سبحان الله'],fr:'Gloire à Allah.',en:'Glory be to Allah.'},
+{id:'amin',nm:'Āmīn',ar:'آمِين',v:['امين'],fr:'Āmīn — exauce (notre invocation).',en:'Āmīn — may it be so.',ctx:1}
+];
+PH.forEach(p=>{p.vs=(p.v||[norm(p.ar)]).map(x=>norm(x).split(' '));if(!p.v)p.vs=[norm(p.ar).split(' ')]});
+let phOn=null;
+function phMatch(t){
+  const tail=norm(t).split(' ').filter(Boolean).slice(-14),n=tail.length;if(!n)return null;
+  let best=null;
+  for(const p of PH){
+    if(p.ctx&&!(last>=0&&last===FE))continue;
+    for(const pn of p.vs){
+      const L=pn.length;
+      for(let st=Math.max(0,n-L-3);st<n;st++){
+        let ptr=0,m=0,li=-1;
+        for(let i=st;i<n;i++){let f=-1;for(let q=ptr;q<=Math.min(L-1,ptr+2);q++){const a=tail[i],b=pn[q];if(a===b||(a.length>2&&b.length>2&&sim(a,b)>=.72)){f=q;break}}
+          if(f>=0){m++;ptr=f+1;li=i}}
+        if(li<n-2||!m)continue;
+        const need=L<=3?L:Math.min(L,4);
+        if(m<need)continue;
+        const sc=m/L+(li===n-1?.05:0)+(m>=L?.2:0);
+        if(!best||sc>best.sc||(sc===best.sc&&L>best.L))best={p,j:ptr-1,sc,m,L}
+      }}}
+  return best;
+}
+function renderPh(b){
+  const lang=$('lang').value,p=b.p,aw=p.ar.split(' ');
+  // surligne les mots arabes (avec voyelles) jusqu'à la progression, en proportion du nombre de mots de la variante
+  const k=Math.round((b.j+1)/b.L*aw.length);
+  const tr=lang?(p[String(lang).slice(0,2)]||p.en||''):'';
+  $('hud').innerHTML='<div class="stack"><div class="c cur ph"><div class="ref">Formule de prière · '+p.nm+'</div><div class="ar">'+aw.map((x,i)=>'<span class="'+(i<k?'d':'')+'">'+x+'</span>').join(' ')+'</div>'+(tr?'<div class="tr">'+tr+'<small class="src">Formule de prière · traduction Basirah (non issue de Tanzil)</small></div>':'')+'</div></div>';
+  $('st').textContent='Formule de prière';phOn=p.id;
+}
+function feed(t){
+  const q=feedQ(t);
+  if(!prayer)return;
+  const b=phMatch(t);
+  if(!b){phOn=null;return}
+  const strong=q>=3.6,short=b.L<=2;
+  if(strong||(short&&q>=GATE))return;
+  renderPh(b);
 }
 // ---- Données vérifiées : chargement des fichiers fournis (format Tanzil : sourate|verset|texte) ----
 let SRC={};const SN=["Al-Fātiḥa", "Al-Baqara", "Āl ʿImrān", "An-Nisāʾ", "Al-Māʾida", "Al-Anʿām", "Al-Aʿrāf", "Al-Anfāl", "At-Tawba", "Yūnus", "Hūd", "Yūsuf", "Ar-Raʿd", "Ibrāhīm", "Al-Ḥijr", "An-Naḥl", "Al-Isrāʾ", "Al-Kahf", "Maryam", "Ṭā-Hā", "Al-Anbiyāʾ", "Al-Ḥajj", "Al-Muʾminūn", "An-Nūr", "Al-Furqān", "Ash-Shuʿarāʾ", "An-Naml", "Al-Qaṣaṣ", "Al-ʿAnkabūt", "Ar-Rūm", "Luqmān", "As-Sajda", "Al-Aḥzāb", "Sabaʾ", "Fāṭir", "Yā-Sīn", "Aṣ-Ṣāffāt", "Ṣād", "Az-Zumar", "Ghāfir", "Fuṣṣilat", "Ash-Shūrā", "Az-Zukhruf", "Ad-Dukhān", "Al-Jāthiya", "Al-Aḥqāf", "Muḥammad", "Al-Fatḥ", "Al-Ḥujurāt", "Qāf", "Adh-Dhāriyāt", "Aṭ-Ṭūr", "An-Najm", "Al-Qamar", "Ar-Raḥmān", "Al-Wāqiʿa", "Al-Ḥadīd", "Al-Mujādila", "Al-Ḥashr", "Al-Mumtaḥana", "Aṣ-Ṣaff", "Al-Jumuʿa", "Al-Munāfiqūn", "At-Taghābun", "Aṭ-Ṭalāq", "At-Taḥrīm", "Al-Mulk", "Al-Qalam", "Al-Ḥāqqa", "Al-Maʿārij", "Nūḥ", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyāma", "Al-Insān", "Al-Mursalāt", "An-Nabaʾ", "An-Nāziʿāt", "ʿAbasa", "At-Takwīr", "Al-Infiṭār", "Al-Muṭaffifīn", "Al-Inshiqāq", "Al-Burūj", "Aṭ-Ṭāriq", "Al-Aʿlā", "Al-Ghāshiya", "Al-Fajr", "Al-Balad", "Ash-Shams", "Al-Layl", "Aḍ-Ḍuḥā", "Ash-Sharḥ", "At-Tīn", "Al-ʿAlaq", "Al-Qadr", "Al-Bayyina", "Az-Zalzala", "Al-ʿĀdiyāt", "Al-Qāriʿa", "At-Takāthur", "Al-ʿAṣr", "Al-Humaza", "Al-Fīl", "Quraysh", "Al-Māʿūn", "Al-Kawthar", "Al-Kāfirūn", "An-Naṣr", "Al-Masad", "Al-Ikhlāṣ", "Al-Falaq", "An-Nās"],NM={};SN.forEach((nm,i)=>NM[i+1]=nm);
@@ -481,7 +538,7 @@ const LS={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v
 const Q=s=>document.querySelector(s);
 let M='salah',pe=-1,sk=-1;const skp=new Set(),done=new Set();let HZ={};try{HZ=JSON.parse(LS.g('hz')||'{}')}catch(e){}
 const MSG={salah:'Appuyez sur Écouter. La traduction du verset récité s’affiche ici, avec la suite attendue en dessous.',study:'Choisissez une sourate, un verset, un juz ou une page ci-dessus, ou récitez pour que l’application vous suive.',hifz:'Récitez de mémoire. La suite est masquée tant que vous ne la révélez pas.',trad:'Khutbah, cours, discussions : traduction de la parole en direct. Nécessite internet, ou le traducteur intégré de Chrome. Pour la prière, utilisez l’onglet Prière.'};
-document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="trf">Traduction en grand (recommandé)</option><option value="both">Arabe en grand + traduction</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
+document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe d’abord, puis traduction (recommandé)</option><option value="trf">Traduction en grand</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
 Q('#tl').append($('lang'));Q('#d1').append($('fs').parentElement);Q('#d2').append(ld);
 const bar3=Q('#bar3');bar3.append($('wb'));
 // --- moteur de reconnaissance : navigateur (en ligne) ou Whisper (hors ligne) ---
@@ -520,7 +577,7 @@ ab.textContent='👓 AR';bar3.append(ab);
 const dc=document.createElement('button');dc.textContent='◐ Discret';dc.onclick=()=>document.body.classList.add('glass');bar3.append(dc);
 const gr=document.createElement('button');gr.textContent='⚙';gr.setAttribute('aria-label','Réglages');gr.onclick=()=>Q('#dr2').classList.toggle('o');bar3.append(gr);
 $('dx2').onclick=()=>Q('#dr2').classList.remove('o');
-const vw=$('vw');vw.value=LS.g('vw')||'trf';const av=()=>{document.body.classList.toggle('v-tr',vw.value==='tr');document.body.classList.toggle('v-ar',vw.value==='ar');document.body.classList.toggle('v-trf',vw.value==='trf')};vw.onchange=()=>{LS.s('vw',vw.value);av()};av();
+const vw=$('vw');vw.value=LS.g('vw')||'both';const av=()=>{document.body.classList.toggle('v-tr',vw.value==='tr');document.body.classList.toggle('v-ar',vw.value==='ar');document.body.classList.toggle('v-trf',vw.value==='trf')};vw.onchange=()=>{LS.s('vw',vw.value);av()};av();
 function setM(m){
   M=m;document.body.dataset.mode=m;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
   prayer=(m==='salah');acc=[];words=[];last=-1;snaps=[{H:[],rak:0,miss:0,f:'hold'}];arS=null;pe=-1;sk=-1;skp.clear();
