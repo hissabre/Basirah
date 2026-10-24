@@ -200,7 +200,7 @@ W.forEach((w,i)=>{w.s=sk(w.t);(U.get(w.s)||U.set(w.s,[]).get(w.s)).push(i);if(w.
 let FE=W.findIndex((w,i)=>V[w.k].n===1&&(!W[i+1]||V[W[i+1].k].n!==1)),B1=W.findIndex((w,i)=>w.k===0&&W[i+1].k!==0);
 const esurah=e=>!W[e+1]||V[W[e+1].k].n!==V[W[e].k].n;
 let prayer=false,words=[],snaps=[{H:[],rak:0,miss:0,f:'hold'}];
-function ex(e){if(e<0)return ST;const r=[e+1,e+2,e+3,e+4];if(esurah(e)||e===B1)r.push(...ST);return r.filter(p=>p<W.length)}
+function ex(e){if(e<0)return ST;const r=[e+1,e+2];if(esurah(e)||e===B1)r.push(...ST);return r.filter(p=>p<W.length)}
 function glob(ws,H){
   const n=ws.length,cs=new Set(),th=n<2?.95:n<3?.78:.66,out={};
   for(let i=0;i<n;i++){const u=U.get(sk(ws[i]));if(u&&u.length<300)u.forEach(p=>cs.add(p+(n-1-i)))}
@@ -210,7 +210,7 @@ function glob(ws,H){
 }
 function step(S,w,i){
   const x=w[i],src=S.H.length?S.H:[{e:-1,sc:0}],seen=new Map();let bs=0,f='exp';
-  for(const h of src)for(const e of ex(h.e)){const d=e-h.e,s=sim(x,W[e].t);if(s>=(d>=3&&d<=4?.75:.55)){bs=Math.max(bs,s);const sc=h.sc*.7+s+(d===1?(prayer?.3:.05):d>=2&&d<=4?-.1*(d-1):0)+(prayer&&e===0?.05:0);const o=seen.get(e);if(!o||sc>o.sc)seen.set(e,{e,sc})}}
+  for(const h of src)for(const e of ex(h.e)){const s=sim(x,W[e].t);if(s>=.55){bs=Math.max(bs,s);const sc=h.sc*.7+s+(e===h.e+1?(prayer?.3:.05):0)+(prayer&&e===0?.05:0);const o=seen.get(e);if(!o||sc>o.sc)seen.set(e,{e,sc})}}
   if(!seen.size||bs<.8){const G=glob(w.slice(Math.max(0,i-3),i+1),S.H);if(G.length){if(!seen.size)f='glob';G.forEach(g=>{const o=seen.get(g.e);if(!o||g.sc>o.sc)seen.set(g.e,{...g,src:'g'})})}}
   if(!seen.size)return{H:S.H,rak:S.rak,miss:S.miss+1,f:'hold'};
   const a0=S.H[0];
@@ -228,7 +228,7 @@ function feedQ(t){
   let S=snaps[m];for(let i=m;i<w.length;i++){S=step(S,w,i);snaps.push(S)}
   const L=S.H;if(!L.length){$('st').textContent=w.length?'… aucun verset reconnu':'';return 0}
   const top=L[0],sn=new Set(),con=[];
-  if(top.sc<GATE&&S.f!=='pin'&&!(last>=0&&Math.abs(top.e-last)<=8&&top.sc>=GATE*.75&&W[top.e].k===W[last].k)){$('st').textContent='';return 0}
+  if(top.sc<GATE&&S.f!=='pin'){$('st').textContent='';return 0}
   for(const h of L){const k=W[h.e].k;if(!sn.has(k)&&h.sc>=top.sc-.25){sn.add(k);con.push(h)}}
   if(con.length>1&&!prayer)renderAmb(con.slice(0,3).map(h=>({e:h.e,k:W[h.e].k})));else render(top.e);
   $('st').textContent=(prayer&&S.rak?'Rakʿa '+S.rak:'')+(con.length===1&&esurah(top.e)?(prayer&&S.rak?' · ':'')+'fin de sourate':'');
