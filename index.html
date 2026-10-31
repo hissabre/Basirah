@@ -384,11 +384,11 @@ function wireWK(){
     if(d.prog&&d.prog.status==='progress')$('st').textContent='Téléchargement du modèle (une seule fois)… '+Math.round(d.prog.progress||0)+' %';
     if(d.dev)window.__wdev=d.dev;if(d.ready){ready=true;$('st').textContent='Modèle prêt ('+(d.dev==='webgpu'?'GPU':'processeur')+') : récitez.'}
     if(d.err){busy=false;$('st').textContent='Erreur Whisper : '+d.err}
-    if(d.text!==undefined){busy=false;const dt=(performance.now()-tw)/1000;window.__wlat=dt;if(dt>5&&wOn)$('st').textContent='Reconnaissance lente sur cet appareil ('+dt.toFixed(1)+' s par fenêtre) : essayez le modèle « Rapide » dans ⚙ › Options avancées.';addWin(d.text);void 0}};
+    if(d.text!==undefined){busy=false;const dt=(performance.now()-tw)/1000;window.__wlat=dt;if(dt>5&&wOn)$('st').textContent='Reconnaissance lente sur cet appareil ('+dt.toFixed(1)+' s par fenêtre) : la fenêtre d’écoute s’allonge automatiquement ; pour plus de vitesse, choisissez « Rapide » dans ⚙ › Options avancées.';addWin(d.text);void 0}};
   const g=k=>{try{return localStorage.getItem(k)}catch(e){return null}};wk.postMessage({init:1,gpu:g('wgpu')==='1',model:g('wmodel')||'Xenova/whisper-base'});
 }
 async function startMic(){
-  const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
+  const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}});
   ac=new AudioContext({sampleRate:16000});
   const src=ac.createMediaStreamSource(s),pr=ac.createScriptProcessor(4096,1,1);
   pr.onaudioprocess=e=>buf.push(new Float32Array(e.inputBuffer.getChannelData(0)));
@@ -398,11 +398,13 @@ function tick(){
   if(busy&&performance.now()-bt>30000){busy=false;$('st').textContent='Whisper met plus de 30 s : modèle trop lourd pour cet appareil. Choisissez « Rapide » dans ⚙ › Options avancées.'}
   if(!wOn||!ready||busy)return;
   const sz=()=>buf.reduce((x,b)=>x+b.length,0);
-  while(buf.length>1&&sz()-buf[0].length>=96000)buf.shift();
+  const keep=Math.round(Math.min(28,Math.max(6,(window.__wlat||0)+3))*16000);
+  while(buf.length>1&&sz()-buf[0].length>=keep)buf.shift();
   const a=new Float32Array(sz());let o=0;buf.forEach(b=>{a.set(b,o);o+=b.length});
   let en=0;for(let i=0;i<a.length;i+=16)en+=a[i]*a[i];
   const rms=Math.sqrt(en/(a.length/16||1));window.__rms=rms;
-  if(rms<.003){if(!acc.length)$('st').textContent='Micro très faible (niveau '+(rms*1000).toFixed(1)+') : parlez plus fort ou rapprochez-vous.';return}
+  if(rms<.0006){if(!acc.length)$('st').textContent='Micro très faible (niveau '+(rms*1000).toFixed(1)+') : parlez plus fort ou rapprochez-vous.';return}
+  if(rms<.08){const gn=Math.min(40,.08/rms);for(let i=0;i<a.length;i++)a[i]=Math.max(-1,Math.min(1,a[i]*gn))}
   busy=true;tw=performance.now();bt=tw;wk.postMessage({audio:a});
 }
 function loopy(nw){if(nw.length<12)return false;const s=new Set();for(let i=0;i+2<nw.length;i++)s.add(nw[i]+' '+nw[i+1]+' '+nw[i+2]);return s.size/(nw.length-2)<.4}
@@ -462,7 +464,7 @@ async function enterAR(){
   const rd=new T.WebGLRenderer({alpha:true,antialias:true});rd.xr.enabled=true;rd.setClearColor(0x000000,0);
   const sc=new T.Scene(),cam=new T.PerspectiveCamera(),mesh=new T.Mesh(new T.PlaneGeometry(.56,.1575),new T.MeshBasicMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false}));
   mesh.renderOrder=999;sc.add(mesh);
-  if(!$('wb').classList.contains('rec'))$('wb').click();
+  if(!window.__demo&&!$('wb').classList.contains('rec'))$('wb').click();
   const ses=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['local-floor']});
   await rd.xr.setSession(ses);
   const off=new T.Vector3(0,-.2,-1.3),tp=new T.Vector3(),SZ=[.8,1,1.3];let zi=1,fr=0,tk=0;
@@ -584,6 +586,22 @@ function srToggle(loc){
 $('wb').onclick=async()=>{if(srOn){srToggle();return}if(wOn){whisperToggle();return}const e=await pickEngine();setEngs(e);if(e==='whisper')whisperToggle();else srToggle(e==='local')};
 ab.textContent='👓 AR';bar3.append(ab);
 const dc=document.createElement('button');dc.textContent='◐ Discret';dc.onclick=()=>document.body.classList.add('glass');bar3.append(dc);
+const dm=document.createElement('button');dm.textContent='▶ Démo';bar3.append(dm);
+(function(){let run=false;const sl=ms=>new Promise(r=>setTimeout(r,ms));
+  const vs=(n,a)=>{const k=V.findIndex(v=>v.n===n&&v.a===a);return k<0?[]:V[k].w.map(norm)};
+  const rng=(n,a,b)=>{let o=[];for(let i=a;i<=b;i++)o=o.concat(vs(n,i));return o};
+  const P=t=>norm(t).split(' ');
+  const SEG=()=>[P('الله اكبر'),rng(1,1,7),rng(112,1,4),P('الله اكبر'),P('سبحان ربي العظيم'),P('سمع الله لمن حمده'),P('ربنا ولك الحمد'),P('الله اكبر'),P('سبحان ربي الاعلى'),P('رب اغفر لي'),P('التحيات لله والصلوات والطيبات السلام عليك ايها النبي ورحمه الله وبركاته'),P('السلام عليكم ورحمه الله')];
+  dm.onclick=async()=>{
+    if(run){run=false;window.__demo=false;dm.textContent='▶ Démo';return}
+    run=true;window.__demo=true;dm.textContent='⏹ Démo';prayer=true;
+    $('st').textContent='Démo : simulation d’une prière (aucun micro utilisé)';
+    while(run){for(const sg of SEG()){if(!run)break;
+        words=[];snaps=[{H:[],rak:0,miss:0,f:'hold'}];last=-1;const tr=[];
+        for(const w of sg){if(!run)break;if(Math.random()<.08)continue;tr.push(w);feed(tr.join(' '));await sl(sg.length<=4?900:520)}
+        await sl(1400)}
+      if(run)await sl(1500)}};
+})();
 const gr=document.createElement('button');gr.textContent='⚙';gr.setAttribute('aria-label','Réglages');gr.onclick=()=>Q('#dr2').classList.toggle('o');bar3.append(gr);
 $('dx2').onclick=()=>Q('#dr2').classList.remove('o');
 const vw=$('vw');vw.value=LS.g('vw')||'both';const av=()=>{document.body.classList.toggle('v-tr',vw.value==='tr');document.body.classList.toggle('v-ar',vw.value==='ar');document.body.classList.toggle('v-trf',vw.value==='trf')};vw.onchange=()=>{LS.s('vw',vw.value);av()};av();
