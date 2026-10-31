@@ -365,7 +365,7 @@ self.onmessage=async e=>{try{
  let r;try{r=await p(e.data.audio,{language:'arabic',task:'transcribe'})}catch(x){if(dev!=='webgpu')throw x;p=await(await P).pipeline('automatic-speech-recognition',M,{device:'wasm'});dev='wasm';self.postMessage({dev});r=await p(e.data.audio,{language:'arabic',task:'transcribe'})}
  self.postMessage({text:r.text});
 }catch(err){self.postMessage({err:String(err)})}};`;
-let wk=null,ready=false,busy=false,ac=null,buf=[],acc=[],wOn=false,ti=null,tw=0;
+let bt=0,wk=null,ready=false,busy=false,ac=null,buf=[],acc=[],wOn=false,ti=null,tw=0;
 const blobU=s=>URL.createObjectURL(new Blob([s],{type:'text/javascript'}));
 const probeW=o=>new Promise(res=>{try{const w=new Worker(blobU('postMessage(1)'),o),t=setTimeout(()=>{try{w.terminate()}catch(e){}res(false)},3000);w.onmessage=()=>{clearTimeout(t);w.terminate();res(true)};w.onerror=()=>{clearTimeout(t);res(false)}}catch(e){res(false)}});
 function inlineW(src){const host={onmessage:null,onerror:null,terminate(){},postMessage(d){Promise.resolve().then(()=>S2.onmessage&&S2.onmessage({data:d}))}},S2={onmessage:null,postMessage(d){Promise.resolve().then(()=>host.onmessage&&host.onmessage({data:d}))}};new Function('self',src)(S2);return host}
@@ -385,7 +385,7 @@ function wireWK(){
     if(d.dev)window.__wdev=d.dev;if(d.ready){ready=true;$('st').textContent='Modèle prêt ('+(d.dev==='webgpu'?'GPU':'processeur')+') : récitez.'}
     if(d.err){busy=false;$('st').textContent='Erreur Whisper : '+d.err}
     if(d.text!==undefined){busy=false;const dt=(performance.now()-tw)/1000;window.__wlat=dt;if(dt>5&&wOn)$('st').textContent='Reconnaissance lente sur cet appareil ('+dt.toFixed(1)+' s par fenêtre) : essayez le modèle « Rapide » dans ⚙ › Options avancées.';addWin(d.text);void 0}};
-  wk.postMessage({init:1,gpu:LS.g('wgpu')!=='0',model:LS.g('wmodel')||'Xenova/whisper-base'});
+  wk.postMessage({init:1,gpu:LS.g('wgpu')==='1',model:LS.g('wmodel')||'Xenova/whisper-base'});
 }
 async function startMic(){
   const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
@@ -395,18 +395,20 @@ async function startMic(){
   src.connect(pr);pr.connect(ac.destination);ti=setInterval(tick,2000);
 }
 function tick(){
+  if(busy&&performance.now()-bt>30000){busy=false;$('st').textContent='Whisper met plus de 30 s : modèle trop lourd pour cet appareil. Choisissez « Rapide » dans ⚙ › Options avancées.'}
   if(!wOn||!ready||busy)return;
   const sz=()=>buf.reduce((x,b)=>x+b.length,0);
   while(buf.length>1&&sz()-buf[0].length>=96000)buf.shift();
   const a=new Float32Array(sz());let o=0;buf.forEach(b=>{a.set(b,o);o+=b.length});
   let en=0;for(let i=0;i<a.length;i+=16)en+=a[i]*a[i];
-  if(Math.sqrt(en/(a.length/16||1))<.01)return;
-  busy=true;tw=performance.now();wk.postMessage({audio:a});
+  const rms=Math.sqrt(en/(a.length/16||1));window.__rms=rms;
+  if(rms<.003){if(!acc.length)$('st').textContent='Micro très faible (niveau '+(rms*1000).toFixed(1)+') : parlez plus fort ou rapprochez-vous.';return}
+  busy=true;tw=performance.now();bt=tw;wk.postMessage({audio:a});
 }
 function loopy(nw){if(nw.length<12)return false;const s=new Set();for(let i=0;i+2<nw.length;i++)s.add(nw[i]+' '+nw[i+1]+' '+nw[i+2]);return s.size/(nw.length-2)<.4}
 function addWin(t){
-  const nw=norm(t).split(' ').filter(Boolean);if(!nw.length)return;
-  if(nw.length>=4&&nw.filter(w=>U.has(sk(w))).length/nw.length<.7)return;
+  const nw=norm(t).split(' ').filter(Boolean);if(!nw.length){if(!acc.length)$('st').textContent='Whisper n’a rien entendu (niveau micro '+((window.__rms||0)*1000).toFixed(1)+').';return}
+  if(nw.length>=4&&nw.filter(w=>U.has(sk(w))).length/nw.length<.7){if(!acc.length)$('st').textContent='Entendu, mais pas reconnu comme Coran : '+t.slice(0,70);return}
   if(loopy(nw))return;
   let ov=0;
   if(acc.length){
@@ -545,7 +547,7 @@ const LS={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v
 const Q=s=>document.querySelector(s);
 let M='salah',pe=-1,sk=-1;const skp=new Set(),done=new Set();let HZ={};try{HZ=JSON.parse(LS.g('hz')||'{}')}catch(e){}
 const MSG={salah:'Appuyez sur Écouter. La traduction du verset récité s’affiche ici, avec la suite attendue en dessous.',study:'Choisissez une sourate, un verset, un juz ou une page ci-dessus, ou récitez pour que l’application vous suive.',hifz:'Récitez de mémoire. La suite est masquée tant que vous ne la révélez pas.',trad:'Khutbah, cours, discussions : traduction de la parole en direct. Nécessite internet, ou le traducteur intégré de Chrome. Pour la prière, utilisez l’onglet Prière.'};
-document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe d’abord, puis traduction (recommandé)</option><option value="trf">Traduction en grand</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Whisper (casque)</h4><select id="wm"><option value="Xenova/whisper-base">Précis (base, recommandé)</option><option value="Xenova/whisper-tiny">Rapide (tiny, moins précis)</option></select><select id="wg"><option value="1">Accélération GPU si disponible</option><option value="0">Processeur seulement</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
+document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe d’abord, puis traduction (recommandé)</option><option value="trf">Traduction en grand</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Whisper (casque)</h4><select id="wm"><option value="Xenova/whisper-base">Précis (base, recommandé)</option><option value="Xenova/whisper-tiny">Rapide (tiny, moins précis)</option></select><select id="wg"><option value="0">Processeur (recommandé)</option><option value="1">Accélération GPU (expérimental)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
 Q('#tl').append($('lang'));Q('#d1').append($('fs').parentElement);Q('#d2').append(ld);
 const bar3=Q('#bar3');bar3.append($('wb'));
 // --- moteur de reconnaissance : navigateur (en ligne) ou Whisper (hors ligne) ---
@@ -568,7 +570,7 @@ async function pickEngine(){const v=eng.value;
   return'whisper'}
 function setEngs(e){const t={local:['sur l’appareil','🔒 Reconnaissance sur l’appareil : fonctionne sans internet, aucun son n’est envoyé.'],browser:['en ligne','🌐 Reconnaissance en ligne : le son est envoyé au service de reconnaissance du navigateur.'],whisper:['Whisper hors ligne','🔒 Reconnaissance hors ligne (Whisper) : aucun son envoyé. Le premier lancement télécharge le modèle.']}[e];
   window.__eg=t[0];$('engs').textContent=t[1];if(window.__paint)window.__paint()}
-eng.onchange=()=>LS.s('eng',eng.value);const wm=$('wm'),wg=$('wg');wm.value=LS.g('wmodel')||'Xenova/whisper-base';wg.value=LS.g('wgpu')||'1';wm.onchange=()=>LS.s('wmodel',wm.value);wg.onchange=()=>LS.s('wgpu',wg.value);
+eng.onchange=()=>LS.s('eng',eng.value);const wm=$('wm'),wg=$('wg');wm.value=LS.g('wmodel')||'Xenova/whisper-base';wg.value=LS.g('wgpu')||'0';wm.onchange=()=>LS.s('wmodel',wm.value);wg.onchange=()=>LS.s('wgpu',wg.value);
 function srToggle(loc){
   const b=$('wb');
   if(srOn){srOn=false;try{rec.stop()}catch(e){}b.textContent='🎙 Écouter';b.classList.remove('rec');return}
