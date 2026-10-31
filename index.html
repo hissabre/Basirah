@@ -385,7 +385,7 @@ function wireWK(){
     if(d.dev)window.__wdev=d.dev;if(d.ready){ready=true;$('st').textContent='Modèle prêt ('+(d.dev==='webgpu'?'GPU':'processeur')+') : récitez.'}
     if(d.err){busy=false;$('st').textContent='Erreur Whisper : '+d.err}
     if(d.text!==undefined){busy=false;const dt=(performance.now()-tw)/1000;window.__wlat=dt;if(dt>5&&wOn)$('st').textContent='Reconnaissance lente sur cet appareil ('+dt.toFixed(1)+' s par fenêtre) : essayez le modèle « Rapide » dans ⚙ › Options avancées.';addWin(d.text);void 0}};
-  wk.postMessage({init:1,gpu:LS.g('wgpu')==='1',model:LS.g('wmodel')||'Xenova/whisper-base'});
+  const g=k=>{try{return localStorage.getItem(k)}catch(e){return null}};wk.postMessage({init:1,gpu:g('wgpu')==='1',model:g('wmodel')||'Xenova/whisper-base'});
 }
 async function startMic(){
   const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
