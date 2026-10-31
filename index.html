@@ -279,7 +279,7 @@ function renderPh(b){
   const k=Math.round((b.j+1)/b.L*aw.length);
   const tr=lang?(p[String(lang).slice(0,2)]||p.en||''):'';
   $('hud').innerHTML='<div class="stack"><div class="c cur ph"><div class="ref">Formule de prière · '+p.nm+'</div><div class="ar">'+aw.map((x,i)=>'<span class="'+(i<k?'d':'')+'">'+x+'</span>').join(' ')+'</div>'+(tr?'<div class="tr">'+tr+'<small class="src">Formule de prière · traduction Basirah (non issue de Tanzil)</small></div>':'')+'</div></div>';
-  $('st').textContent='Formule de prière';phOn=p.id;
+  $('st').textContent='Formule de prière';phOn=p.id;try{arS={t:'ph',p,aw,k};dirty=true}catch(e){}
 }
 function feed(t){
   const q=feedQ(t);
@@ -356,10 +356,14 @@ init();
 
 // ---- Quest : reconnaissance Whisper dans le navigateur (worker) + mode démo ----
 const WK=`const P=(async()=>{const er=[];for(const u of['https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0/dist/transformers.min.js','https://unpkg.com/@huggingface/transformers@3.0.0/dist/transformers.min.js','https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0']){try{return await import(u)}catch(e){er.push(new URL(u).host+' : '+(e&&e.message||e))}}throw new Error('moteur inaccessible ('+er.join(' ; ')+')')})();P.catch(()=>{});
-let p=null;
+let p=null,M='',dev='wasm';
 self.onmessage=async e=>{try{
- if(e.data.init){p=await(await P).pipeline('automatic-speech-recognition','Xenova/whisper-base',{device:'wasm',progress_callback:x=>self.postMessage({prog:x})});self.postMessage({ready:1});return}
- const r=await p(e.data.audio,{language:'arabic',task:'transcribe'});self.postMessage({text:r.text});
+ if(e.data.init){const T=await P;M=e.data.model||'Xenova/whisper-base';const pg=x=>self.postMessage({prog:x});
+  if(e.data.gpu&&self.navigator&&navigator.gpu){try{p=await T.pipeline('automatic-speech-recognition',M,{device:'webgpu',dtype:{encoder_model:'fp32',decoder_model_merged:'q4'},progress_callback:pg});dev='webgpu'}catch(x){p=null}}
+  if(!p){p=await T.pipeline('automatic-speech-recognition',M,{device:'wasm',progress_callback:pg});dev='wasm'}
+  self.postMessage({ready:1,dev});return}
+ let r;try{r=await p(e.data.audio,{language:'arabic',task:'transcribe'})}catch(x){if(dev!=='webgpu')throw x;p=await(await P).pipeline('automatic-speech-recognition',M,{device:'wasm'});dev='wasm';self.postMessage({dev});r=await p(e.data.audio,{language:'arabic',task:'transcribe'})}
+ self.postMessage({text:r.text});
 }catch(err){self.postMessage({err:String(err)})}};`;
 let wk=null,ready=false,busy=false,ac=null,buf=[],acc=[],wOn=false,ti=null,tw=0;
 const blobU=s=>URL.createObjectURL(new Blob([s],{type:'text/javascript'}));
@@ -378,10 +382,10 @@ function wireWK(){
   wk.onerror=e=>{$('st').textContent='Erreur Whisper : le moteur ne démarre pas ('+(e.message||'réseau bloqué ?')+')'};
   wk.onmessage=e=>{const d=e.data;
     if(d.prog&&d.prog.status==='progress')$('st').textContent='Téléchargement du modèle (une seule fois)… '+Math.round(d.prog.progress||0)+' %';
-    if(d.ready){ready=true;$('st').textContent='Modèle prêt : récitez.'}
+    if(d.dev)window.__wdev=d.dev;if(d.ready){ready=true;$('st').textContent='Modèle prêt ('+(d.dev==='webgpu'?'GPU':'processeur')+') : récitez.'}
     if(d.err){busy=false;$('st').textContent='Erreur Whisper : '+d.err}
-    if(d.text!==undefined){busy=false;addWin(d.text);void 0}};
-  wk.postMessage({init:1});
+    if(d.text!==undefined){busy=false;const dt=(performance.now()-tw)/1000;window.__wlat=dt;if(dt>5&&wOn)$('st').textContent='Reconnaissance lente sur cet appareil ('+dt.toFixed(1)+' s par fenêtre) : essayez le modèle « Rapide » dans ⚙ › Options avancées.';addWin(d.text);void 0}};
+  wk.postMessage({init:1,gpu:LS.g('wgpu')!=='0',model:LS.g('wmodel')||'Xenova/whisper-base'});
 }
 async function startMic(){
   const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
@@ -429,13 +433,15 @@ renderAmb=function(c){_ra(c);arS={t:'amb',c};dirty=true};
 function drawAR(cv){
   const g=cv.getContext('2d'),cw=cv.width,lang=$('lang').value;g.clearRect(0,0,cw,cv.height);g.textAlign='center';
   const box=(h,w=cw)=>{g.fillStyle='rgba(6,10,9,.62)';g.beginPath();g.roundRect((cw-w)/2,0,w,h,28);g.fill()};
-  if(!arS){box(70,620);g.fillStyle='#9fb3ab';g.font='28px system-ui,sans-serif';g.fillText(wOn?(ready?'Basirah · à l’écoute':'Chargement du modèle…'):'Micro inactif : appuyez sur Écouter',cw/2,46);return}
+  if(!arS){box(70,620);g.fillStyle='#9fb3ab';g.font='28px system-ui,sans-serif';g.fillText(wOn?(ready?'Basirah · à l’écoute':'Chargement du modèle…'):'Micro inactif : gâchette = écouter',cw/2,46);return}
   if(arS.t==='amb'){box(130,760);g.fillStyle='#e0a458';g.font='30px system-ui,sans-serif';g.fillText('⚠ Plusieurs versets possibles',cw/2,50);g.fillStyle='#fff';g.font='28px system-ui,sans-serif';g.fillText(arS.c.map(x=>V[x.k].n+':'+V[x.k].a).join('  ·  '),cw/2,100);return}
-  const w=W[arS.e],v=V[w.k],ws=v.w,n=ws.length,j=w.j,st=Math.max(0,Math.min(j-3,n-8)),en=Math.min(n,st+8),it=[];
+  let ws,j,ref,tr;
+  if(arS.t==='ph'){ws=arS.aw;j=arS.k-1;ref='Formule de prière · '+arS.p.nm;tr=lang?(arS.p[String(lang).slice(0,2)]||arS.p.en||''):''}
+  else{const w=W[arS.e],v=V[w.k];ws=v.w;j=w.j;ref=v.name+' '+v.n+':'+v.a;tr=lang&&v[lang]?v[lang]:''}
+  const n=ws.length,prov=arS.t!=='ph'&&lang&&String(SRC[lang]).startsWith('⚠'),st=Math.max(0,Math.min(j-3,n-8)),en=Math.min(n,st+8),it=[];
   if(st>0)it.push(['…',0]);for(let i=st;i<en;i++)it.push([ws[i],i<=j?1:2]);if(en<n)it.push(['…',0]);
-  const tr=lang&&v[lang]?v[lang]:'',prov=lang&&String(SRC[lang]).startsWith('⚠');
   box(tr?262:150);
-  g.fillStyle='#7fd6b4';g.font='22px system-ui,sans-serif';g.fillText(v.name+' '+v.n+':'+v.a,cw/2,32);
+  g.fillStyle='#7fd6b4';g.font='22px system-ui,sans-serif';g.fillText(ref,cw/2,32);
   let fs=60,tot=0;const gap=24;
   for(;fs>34;fs-=4){g.font='600 '+fs+'px Amiri,"Noto Naskh Arabic","Traditional Arabic",serif';tot=it.reduce((a,x)=>a+g.measureText(x[0]).width+gap,-gap);if(tot<cw-70)break}
   g.textAlign='left';let x=(cw+tot)/2;
@@ -454,6 +460,7 @@ async function enterAR(){
   const rd=new T.WebGLRenderer({alpha:true,antialias:true});rd.xr.enabled=true;rd.setClearColor(0x000000,0);
   const sc=new T.Scene(),cam=new T.PerspectiveCamera(),mesh=new T.Mesh(new T.PlaneGeometry(.56,.1575),new T.MeshBasicMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false}));
   mesh.renderOrder=999;sc.add(mesh);
+  if(!wOn&&!srOn)$('wb').click();
   const ses=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['local-floor']});
   await rd.xr.setSession(ses);
   const off=new T.Vector3(0,-.2,-1.3),tp=new T.Vector3(),SZ=[.8,1,1.3];let zi=1,fr=0,tk=0;
@@ -463,7 +470,7 @@ async function enterAR(){
     mesh.position.lerp(tp,.06);mesh.quaternion.slerp(cam.quaternion,.06);
     if(dirty||++tk%45===0){drawAR(cv);tex.needsUpdate=true;dirty=false}
     rd.render(sc,cam)});
-  ses.addEventListener('select',()=>{const o=[...$('lang').options].map(x=>x.value),i=o.indexOf($('lang').value);$('lang').value=o[(i+1)%o.length];dirty=true});
+  ses.addEventListener('select',()=>{$('wb').click();dirty=true});
   ses.addEventListener('squeeze',()=>{zi=(zi+1)%3;mesh.scale.setScalar(SZ[zi])});
   ses.addEventListener('end',()=>{rd.setAnimationLoop(null);rd.dispose();tex.dispose()});
 }
@@ -538,7 +545,7 @@ const LS={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v
 const Q=s=>document.querySelector(s);
 let M='salah',pe=-1,sk=-1;const skp=new Set(),done=new Set();let HZ={};try{HZ=JSON.parse(LS.g('hz')||'{}')}catch(e){}
 const MSG={salah:'Appuyez sur Écouter. La traduction du verset récité s’affiche ici, avec la suite attendue en dessous.',study:'Choisissez une sourate, un verset, un juz ou une page ci-dessus, ou récitez pour que l’application vous suive.',hifz:'Récitez de mémoire. La suite est masquée tant que vous ne la révélez pas.',trad:'Khutbah, cours, discussions : traduction de la parole en direct. Nécessite internet, ou le traducteur intégré de Chrome. Pour la prière, utilisez l’onglet Prière.'};
-document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe d’abord, puis traduction (recommandé)</option><option value="trf">Traduction en grand</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
+document.body.insertAdjacentHTML('afterbegin','<header id="top2"><div class="br">بصيرة<b>Basirah</b></div><nav id="tabs"><button data-m="salah">🕌 Prière</button><button data-m="study">📖 Étude</button><button data-m="hifz">🧠 Hifz</button><button data-m="trad">🗣 Khutbah</button></nav><span id="tl"></span></header><div id="nav"><button id="pv2">◀</button><button id="hd">👁 Masquer la suite</button><span id="hn"></span><span id="hc"></span><button id="nx3">▶</button></div><div id="bar3"></div><div id="dr2"><div class="dh"><b>Réglages</b><button id="dx2">✕</button></div><h4>Taille du texte</h4><div id="d1"></div><h4>Affichage</h4><select id="vw"><option value="both">Arabe d’abord, puis traduction (recommandé)</option><option value="trf">Traduction en grand</option><option value="tr">Traduction seule</option><option value="ar">Arabe seul</option></select><h4>Reconnaissance</h4><div id="engs" class="st">Choisie automatiquement au moment d’écouter.</div><details id="advd"><summary>Options avancées</summary><div id="adv"><h4>Moteur de reconnaissance</h4><select id="eng"><option value="auto">Automatique (recommandé)</option><option value="local">Navigateur, sur l’appareil (hors ligne)</option><option value="browser">Navigateur, en ligne</option><option value="whisper">Whisper (hors ligne, bêta)</option></select><h4>Whisper (casque)</h4><select id="wm"><option value="Xenova/whisper-base">Précis (base, recommandé)</option><option value="Xenova/whisper-tiny">Rapide (tiny, moins précis)</option></select><select id="wg"><option value="1">Accélération GPU si disponible</option><option value="0">Processeur seulement</option></select><h4>Traductions</h4><div id="d2"></div><p><a href="https://tanzil.net/trans/" target="_blank" rel="noopener">⬇ Télécharger d’autres traductions (Tanzil)</a><br><small>Choisissez « Text (with aya numbers) », puis ajoutez le fichier avec le bouton ci-dessus.</small></p><h4>Sources et licences</h4><div id="src"></div></div></details></div>');
 Q('#tl').append($('lang'));Q('#d1').append($('fs').parentElement);Q('#d2').append(ld);
 const bar3=Q('#bar3');bar3.append($('wb'));
 // --- moteur de reconnaissance : navigateur (en ligne) ou Whisper (hors ligne) ---
@@ -561,7 +568,7 @@ async function pickEngine(){const v=eng.value;
   return'whisper'}
 function setEngs(e){const t={local:['sur l’appareil','🔒 Reconnaissance sur l’appareil : fonctionne sans internet, aucun son n’est envoyé.'],browser:['en ligne','🌐 Reconnaissance en ligne : le son est envoyé au service de reconnaissance du navigateur.'],whisper:['Whisper hors ligne','🔒 Reconnaissance hors ligne (Whisper) : aucun son envoyé. Le premier lancement télécharge le modèle.']}[e];
   window.__eg=t[0];$('engs').textContent=t[1];if(window.__paint)window.__paint()}
-eng.onchange=()=>LS.s('eng',eng.value);
+eng.onchange=()=>LS.s('eng',eng.value);const wm=$('wm'),wg=$('wg');wm.value=LS.g('wmodel')||'Xenova/whisper-base';wg.value=LS.g('wgpu')||'1';wm.onchange=()=>LS.s('wmodel',wm.value);wg.onchange=()=>LS.s('wgpu',wg.value);
 function srToggle(loc){
   const b=$('wb');
   if(srOn){srOn=false;try{rec.stop()}catch(e){}b.textContent='🎙 Écouter';b.classList.remove('rec');return}
