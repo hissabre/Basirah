@@ -1,0 +1,14 @@
+# Un clic : GitHub → onglet Actions → « generate-phonemes » → Run workflow. Le résultat est téléchargeable dans « Artifacts ».
+name: generate-phonemes
+on: { workflow_dispatch: {} }
+jobs:
+  gen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install quranic-phonemizer
+      - run: python tools/gen_expected_phonemes.py
+      - uses: actions/upload-artifact@v4
+        with: { name: phonemes-hafs, path: phonemes-hafs.json }
