@@ -2,7 +2,7 @@
 <style>
 :root{--bg:#f6f3ec;--fg:#1f2a24;--mut:#6b756e;--card:#fffdf8;--ln:#ddd6c6;--ac:#1d6b52;--warn:#a33}
 @media(prefers-color-scheme:dark){:root{--bg:#10171a;--fg:#e8e6df;--mut:#97a39b;--card:#172127;--ln:#2b3a40;--ac:#4cc29a;--warn:#ff8a80}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif}
 main{max-width:760px;margin:0 auto;padding:16px}h1{font-size:1.2rem;margin:0 0 4px}.mut{color:var(--mut)}small{font-size:.8rem}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}button,select,input{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--card);color:var(--fg)}
 button{cursor:pointer}button.sel,button.on{background:var(--ac);color:#fff;border-color:var(--ac)}select{flex:1;min-width:0}
