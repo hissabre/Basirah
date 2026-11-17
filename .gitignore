@@ -1,0 +1,8 @@
+node_modules/
+diag/js/
+models/**
+!models/README.md
+!models/quranlab-zipformer/README.md
+*.onnx
+.env
+basirah.config.json
