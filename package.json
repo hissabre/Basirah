@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "C\u0153ur partag\u00e9 de Basirah : alignement du Coran, machine d'\u00e9tats, audio. Ind\u00e9pendant du moteur de reconnaissance.",
+  "description": "Cœur partagé de Basirah : alignement du Coran, machine d'états, audio. Indépendant du moteur de reconnaissance.",
   "scripts": {
     "test": "node --experimental-transform-types --no-warnings test/run.ts && node --experimental-transform-types --no-warnings test/run-phoneme.ts && node --experimental-transform-types --no-warnings test/run-engine.ts && node --experimental-transform-types --no-warnings test/run-eval.ts && node --experimental-transform-types --no-warnings test/run-core.ts && node --experimental-transform-types --no-warnings test/run-app.ts",
     "typecheck": "tsc --noEmit",
@@ -17,5 +17,8 @@
   "devDependencies": {
     "esbuild": "^0.25.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }
