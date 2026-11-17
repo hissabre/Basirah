@@ -56,7 +56,7 @@ async function makeEngine(): Promise<RecognitionEngine> {
 async function start() {
   err(null); if (running) return;
   try {
-    const e = await makeEngine(); finals = []; lastText = '';
+    const e = await makeEngine(); finals = []; lastText = ''; if (mode !== 'reading') session.reset();
     session.attachEngine(e, 'text'); e.on('state', (s, w) => { diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
     e.on('result', r => { lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
     engine = e; tStart = performance.now(); lastKey = ''; tl.length = 0; await e.load(); running = true; setBtn();
