@@ -50,6 +50,12 @@ export class Session {
     if (m !== 'translation') this.wordAl.setProfile((m === 'prayer' ? 'prayer' : m === 'hifz' ? 'hifz' : 'reading') as ProfileName);
     this.emit();
   }
+  /** Nouvelle prise : oublie la position et les hypothèses de l'écoute précédente (le mode et le moteur sont conservés). */
+  reset() {
+    this.wordAl = new Aligner(this.d.quran, 'prayer'); this.phAl = this.d.phoneme ? new Aligner(this.d.phoneme, 'phoneme') : null;
+    if (this.mode !== 'translation') this.wordAl.setProfile((this.mode === 'prayer' ? 'prayer' : this.mode === 'hifz' ? 'hifz' : 'reading') as ProfileName);
+    this.pos = null; this.status = 'idle'; this.conf = 0; this.margin = 0; this.events = []; this.stuck = null; this.stab.reset(); this.note('nouvelle prise : position remise à zéro'); this.emit();
+  }
   /** Navigation manuelle (Lecture) ou reprise : fixe la position sans perdre le suivi. */
   goto(surah: number, ayah: number, word = 0) {
     const i = this.d.quran.indexOf(surah, ayah, word); if (i < 0) { this.note(`goto ${surah}:${ayah} : inexistant`); return false; }
