@@ -15,6 +15,8 @@ const tr = new TranslationPipeline(new UnavailableTranslator('offline', 'aucun',
 const session = new Session({ quran: q, translation: tr });
 const cap = new AudioCapture({ onChunk: (p, t) => engine?.pushAudio(p, t), onStatus: (s, w) => diagLog(`micro : ${s} — ${w}`) });
 let engine: RecognitionEngine | null = null, running = false, engineKind = 'offline-zipformer', lastText = '', finals: string[] = [];
+const tl: string[] = []; let tStart = performance.now(); let lastKey = '';
+const tlog = (m: string) => { tl.push(((performance.now() - tStart) / 1000).toFixed(1).padStart(6) + ' s  ' + m); if (tl.length > 400) tl.shift(); };
 const dl: string[] = []; const diagLog = (m: string) => { dl.push(new Date().toLocaleTimeString() + ' ' + m); if (dl.length > 300) dl.shift(); };
 const err = (m: string | null) => { const e = $('err'); e.hidden = !m; e.textContent = m ?? ''; if (m) diagLog('ERREUR : ' + m); };
 
@@ -56,8 +58,8 @@ async function start() {
   try {
     const e = await makeEngine(); finals = []; lastText = '';
     session.attachEngine(e, 'text'); e.on('state', (s, w) => { diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
-    e.on('result', r => { lastText = r.text; if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
-    engine = e; await e.load(); running = true; setBtn();
+    e.on('result', r => { lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
+    engine = e; tStart = performance.now(); lastKey = ''; tl.length = 0; await e.load(); running = true; setBtn();
     if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else await cap.start();
   } catch (x) { running = false; engine = null; err((x as Error).message); setBtn(); }
 }
@@ -88,13 +90,13 @@ function render(v: SessionView) {
     const hs = mode === 'hifz' ? v.hifz : null;
     box.innerHTML = `<div class="ref">${p.surah}:${p.ayah}</div><div class="ar">` + verse.words.map((w, i) => `<span class="${i < p.word ? 'done' : i === p.word ? 'cur' : ''}">${w}</span>`).join(' ') + '</div>' + (hs ? '' : '');
   }
-  $('heard').textContent = lastText || '—';
+  $('heard').textContent = lastText ? (lastText.length > 160 ? '… ' + lastText.slice(-160) : lastText) : '—';
   $('conf').textContent = `confiance ${v.confidence.toFixed(2)} · marge ${v.margin.toFixed(2)}`;
   const h = v.hifz; if (h) $('hifz').textContent = `ok ${h.ok} · incertain ${h.uncertain} · peut-être omis ${h.missed} · à vérifier ${h.wrong} · répétitions ${h.repeats}` + (v.stuck ? ` — Bloqué ? Indice : ${v.stuck.hint.join(' ')}` : '');
   $('events').textContent = v.recentEvents.map(e => `${e.at.toFixed(1)}s ${e.kind}`).join(' · ') || '—';
   if (mode === 'translation') { const s = tr.subtitles.slice(-6); $('sub').innerHTML = (tr.info().kind, '<div class="mut">' + (s.length ? '' : 'En attente de parole…') + '</div>') + s.map(x => `<div>${x.source}<br><span class="mut">${x.target ?? (x.error ?? 'traduction indisponible')}</span></div>`).join(''); }
 }
-session.onUpdate(render); tr.onUpdate(() => render(session.view()));
+session.onUpdate(v => { const k = v.position ? `${v.position.surah}:${v.position.ayah}/${v.position.word}` : '-'; if (k !== lastKey) { lastKey = k; tlog(`POSITION → ${k} (${v.status})`); } render(v); }); tr.onUpdate(() => render(session.view()));
 setInterval(() => { if (running) session.tick((performance.now()) / 1000 - t0); }, 1000); const t0 = performance.now() / 1000;
 
 // ── Diagnostic ────────────────────────────────────────────────────────────────
@@ -106,7 +108,7 @@ setInterval(() => {
   const s = cap.stats(); $('lvl').style.width = Math.min(100, s.rms * 600) + '%';
   const zero = s.status === 'running' && s.maxPeak === 0 && s.silentMs > 4000;
   $('stats').textContent = (zero ? '⚠ SILENCE NUMÉRIQUE EXACT depuis ' + (s.silentMs / 1000).toFixed(0) + ' s : le micro choisi n\'envoie aucun signal (muet, mauvais périphérique, ou bloqué par Windows/Chrome). Choisissez un autre micro ci-dessus.\n' : '') + `piste : ${s.track ? `${s.track.label} · muet=${s.track.muted} · actif=${s.track.enabled} · ${s.track.readyState} · ${s.track.settings}` : '—'}\ncrête maximale depuis le début : ${s.maxPeak.toFixed(4)}\nmicro ${s.status} · niveau ${s.rms.toFixed(4)} · crête ${s.peak.toFixed(3)} · silence ${(s.silentMs / 1000).toFixed(1)} s · fréquence ${s.sampleRate ?? '—'} Hz · autorisations ${s.permissionRequests} · flux ${s.streams} · abandonné ${s.dropped}`;
-  const v = session.view(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
+  const v = session.view(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', 'CHRONOLOGIE (temps depuis le démarrage)', ...tl.slice(-80), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
 }, 500);
 $('copy').onclick = () => navigator.clipboard.writeText($('stats').textContent + '\n' + $('dlog').textContent).then(() => diagLog('rapport copié'));
 
