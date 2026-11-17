@@ -1,0 +1,230 @@
+{
+  "_note": "status = cleared UNIQUEMENT avec preuve écrite (evidence). unverified = non lu/non confirmé = traité comme bloquant en construction commerciale. Pas un avis juridique.",
+  "components": [
+    {
+      "id": "quran-text-hafs",
+      "kind": "texte",
+      "origin": "Tanzil (Uthmani)",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial",
+        "embedded-redistribution"
+      ],
+      "notes": "Voir docs/05-LICENCES.md §1. Candidats : QUL (par ressource), KFGQPC (accord écrit), Quran Foundation (licence signée pour l'hors ligne)."
+    },
+    {
+      "id": "quran-text-warsh",
+      "kind": "texte",
+      "origin": "aucune source vérifiée",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial",
+        "embedded-redistribution"
+      ],
+      "notes": "Aucune donnée Warsh dans le dépôt."
+    },
+    {
+      "id": "translations-tanzil",
+      "kind": "traductions",
+      "origin": "Tanzil : Hamidullah, Saheeh, García, Min. indonésien, Diyanet, Kuliev",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial",
+        "embedded-redistribution"
+      ],
+      "notes": "Œuvres de tiers ; aucune licence par traduction enregistrée."
+    },
+    {
+      "id": "quranlab-zipformer",
+      "kind": "modèle",
+      "origin": "Quran-Lab (waqf)",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial",
+        "redistribution-weights"
+      ],
+      "notes": "Permission annoncée, portée non documentée : voir permissions/quranlab-zipformer.json."
+    },
+    {
+      "id": "quranlab-benchmark",
+      "kind": "données",
+      "origin": "Quran-Lab/quranic-asr-benchmark",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "internal-evaluation"
+      ],
+      "notes": "Recherche/évaluation uniquement, redistribution interdite : NE JAMAIS embarquer dans le produit."
+    },
+    {
+      "id": "whisper-quran-tarteel",
+      "kind": "modèle",
+      "origin": "tarteel-ai/whisper-base-ar-quran",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Apache-2.0 déclarée ; données d'entraînement non indiquées."
+    },
+    {
+      "id": "whisper-cpp",
+      "kind": "bibliothèque",
+      "origin": "ggerganov/whisper.cpp v1.7.2",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "MIT présumé : fichier LICENSE à relire et à joindre."
+    },
+    {
+      "id": "sherpa-onnx",
+      "kind": "bibliothèque",
+      "origin": "k2-fsa/sherpa-onnx",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Apache-2.0 présumé : à confirmer et joindre."
+    },
+    {
+      "id": "fonts-embedded",
+      "kind": "polices",
+      "origin": "Amiri Quran, Plus Jakarta Sans, Space Grotesk, JetBrains Mono",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "SIL OFL présumée ; textes OFL et avis absents du ZIP."
+    },
+    {
+      "id": "meta-spatial-sdk",
+      "kind": "bibliothèque",
+      "origin": "Meta Spatial SDK (Quest seulement)",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Absent de la version téléphone."
+    },
+    {
+      "id": "online-asr-provider",
+      "kind": "service",
+      "origin": "à choisir (Deepgram ou autre)",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Conditions du fournisseur (données audio, rétention, usage) à lire avant choix."
+    },
+    {
+      "id": "basirah-logo",
+      "kind": "marque",
+      "origin": "Hamadoun",
+      "status": "cleared",
+      "evidence": "création du client (déclaration)",
+      "needs": [
+        "commercial"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "quranlab-tajweedformer-v4",
+      "kind": "model (SDK)",
+      "origin": "https://sdk.quranlab.ai — licence NPL-1.2",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "NPL-1.2 (résumé lu le 2026-11-17, texte intégral à relire sur sdk.quranlab.ai/licence) : interdit de faire payer le modèle, l'accès ou une fonctionnalité qu'il alimente (ventes, abonnements, essais payants, publicité sur la fonctionnalité) ; « aucune licence pour facturer ne sera accordée ». Usage gratuit autorisé. Affichage obligatoire : le retour de tajweed automatique peut être faux et ne remplace pas un enseignant qualifié."
+    },
+    {
+      "id": "quranlab-zipformer-quran-3",
+      "kind": "model",
+      "origin": "Hugging Face Quran-Lab (accès sur demande) — NPL-1.2",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "commercial",
+        "redistribution-weights"
+      ],
+      "notes": "Même licence NPL-1.2 ; remplacé par TajweedFormer V4 côté SDK."
+    },
+    {
+      "id": "quranlab-tajweed-phonetics",
+      "kind": "dataset",
+      "origin": "Hugging Face (téléchargement libre) — NPL-1.2",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "6236 versets en phones avec règles de tajweed ; source possible du lexique phonémique."
+    },
+    {
+      "id": "quranlab-benchmark-600",
+      "kind": "dataset",
+      "origin": "Hugging Face (accès sur demande) — NPL-1.2",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "internal-evaluation"
+      ],
+      "notes": "600 clips de test avec références : évaluation interne."
+    },
+    {
+      "id": "sawt-restoration",
+      "kind": "model",
+      "origin": "Quran-Lab SAWT — licence non commerciale",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Restauration audio ; lourde (GPU), non commerciale ; non prévue sur appareil."
+    },
+    {
+      "id": "mfa-quran-hafs",
+      "kind": "model",
+      "origin": "Hugging Face — Apache-2.0",
+      "status": "blocked",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Alignement forcé (Montreal Forced Aligner) pour le chronométrage ; licence permissive à confirmer sur la page du modèle."
+    },
+    {
+      "id": "quranic-phonemizer",
+      "kind": "tool (G2P tajweed)",
+      "origin": "PyPI / github.com/QUD-Technologies/quranic-phonemizer — MIT (selon PyPI)",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Licence MIT annoncée sur PyPI ; relire le fichier LICENSE du dépôt. Sert à produire les phonèmes attendus par verset avec règles de tajweed."
+    },
+    {
+      "id": "quran-muaalem",
+      "kind": "model (Wav2Vec2-BERT 660M, serveur)",
+      "origin": "github.com/obadx/quran-muaalem ; HF obadx/muaalem-model-v3_x — LicenseRef-QML-1.0",
+      "status": "unverified",
+      "evidence": null,
+      "needs": [
+        "commercial"
+      ],
+      "notes": "Selon PyPI : Apache 2.0 + conditions (divulgation IA, conformité à la charia, pas de publicité ni de suivi, voie gratuite visible pour les fonctions de base si payant). Lourd (≈1,5 Go GPU) : serveur, pas appareil. Lire la licence complète."
+    }
+  ]
+}

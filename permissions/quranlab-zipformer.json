@@ -1,0 +1,14 @@
+{
+  "component": "Quran-Lab Zipformer (zipformer_p-quran) — poids, tokenizer, table texte→phonèmes",
+  "grantor": "Quran-Lab (waqf)",
+  "evidence": null,
+  "grants": {
+    "internal-evaluation": null,
+    "commercial-use": null,
+    "modification-finetuning": null,
+    "redistribution-weights": null,
+    "derivative-works": null
+  },
+  "conditions": [],
+  "_note": "À REMPLIR à partir du document de permission reçu. Tant que `evidence` est vide, toute construction commerciale est refusée par src/licensing/gate.ts. Le texte public de l'accord Hugging Face (NPL-1.1) interdit l'usage commercial : la permission obtenue doit être écrite et préciser ses limites."
+}

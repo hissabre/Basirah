@@ -1,0 +1,29 @@
+{
+  "build": "internal",
+  "quran": {
+    "dataPath": "data/quran-hafs-uthmani.json",
+    "sourceDescriptorPath": "data/quran-hafs-uthmani.source.json"
+  },
+  "offline": {
+    "engine": "zipformer",
+    "modelPath": "<À_RENSEIGNER>",
+    "tokensPath": "<À_RENSEIGNER>",
+    "lexiconPath": "<À_RENSEIGNER>",
+    "numThreads": 2,
+    "maxBacklogSec": 5
+  },
+  "online": {
+    "relayUrl": "<À_RENSEIGNER>",
+    "tokenEndpoint": "<À_RENSEIGNER>",
+    "provider": "mock",
+    "language": "ar",
+    "maxRetries": 5
+  },
+  "translation": {
+    "sourceLang": "ar",
+    "targetLang": "fr",
+    "onlineUrl": null,
+    "offlineModelPath": null
+  },
+  "behaviour": { "autoFallbackToOffline": false }
+}

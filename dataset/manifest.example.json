@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "name": "exemple — AUCUN enregistrement réel ; remplacer par les vôtres",
+  "recordings": [
+    {
+      "id": "exemple-ikhlas-001",
+      "audio": "exemple/ikhlas.wav",
+      "durationSec": null,
+      "source": { "type": "own", "note": "enregistrement réalisé par l'équipe" },
+      "reciter": { "id": "reciter-a", "name": "À renseigner" },
+      "riwaya": "hafs",
+      "reference": { "segments": [ { "kind": "quran", "surah": 112, "ayahFrom": 1, "ayahTo": 4,
+        "ayahTimes": [ { "surah": 112, "ayah": 1, "startSec": 0.0, "endSec": 4.1 } ] } ] },
+      "licence": { "status": "own", "name": "enregistrement propre", "evidence": "accord interne daté", "uses": { "internal-evaluation": true, "training": false, "redistribution": false, "commercial": false } },
+      "conditions": { "environment": "home", "noise": "clean", "speed": "medium", "style": "murattal", "mic": "téléphone" },
+      "split": "test"
+    },
+    {
+      "id": "exemple-youtube-taraweeh",
+      "audio": "exemple/taraweeh.wav",
+      "durationSec": null,
+      "source": { "type": "youtube", "url": "https://www.youtube.com/watch?v=À_RENSEIGNER" },
+      "reciter": { "id": "imam-b", "name": "À renseigner" },
+      "riwaya": "hafs",
+      "reference": { "segments": [ { "kind": "quran", "surah": 2, "ayahFrom": 1, "ayahTo": 5 } ] },
+      "licence": { "status": "platform-terms-only", "name": "conditions de la plateforme + droits du récitant : NON vérifiés", "evidence": null, "uses": { "internal-evaluation": null, "training": null, "redistribution": null, "commercial": null } },
+      "conditions": { "environment": "mosque", "noise": "moderate", "reverb": "high", "speed": "medium", "style": "taraweeh-imam" },
+      "split": "test"
+    }
+  ]
+}

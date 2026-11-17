@@ -1,0 +1,5 @@
+numpy
+soundfile
+sherpa-onnx          # Zipformer (streaming)
+transformers         # Whisper Coran (comparaison)
+torch

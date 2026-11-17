@@ -1,0 +1,2 @@
+{ "compilerOptions": { "target":"ES2022","module":"ESNext","moduleResolution":"Bundler","allowImportingTsExtensions":true,"rewriteRelativeImportExtensions":true,"lib":["ES2022","DOM","DOM.Iterable"],"skipLibCheck":true,"outDir":"diag/js","rootDir":"src/audio","strict":true },
+  "files": ["src/audio/capture.ts","src/audio/ringbuffer.ts"] }

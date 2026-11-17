@@ -1,0 +1,134 @@
+import { QuranDB, type RawQuran } from '../src/quran/db.ts';
+import { Session, type Mode, type SessionView } from '../src/session/session.ts';
+import { AudioCapture } from '../src/audio/capture.ts';
+import { OnlineEngine } from '../src/engine/online.ts';
+import { WebSocketProvider } from '../src/engine/ws-provider.ts';
+import { WebSpeechEngine, speechSupported } from '../src/engine/webspeech.ts';
+import { TajweedFormerEngine } from '../src/engine/tajweedformer.ts';
+import { TranslationPipeline, UnavailableTranslator } from '../src/translation/pipeline.ts';
+import type { RecognitionEngine } from '../src/types.ts';
+
+declare const QURAN: RawQuran;
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const q = new QuranDB(QURAN);
+const tr = new TranslationPipeline(new UnavailableTranslator('offline', 'aucun', 'Aucun traducteur n\'est branché : la traduction reste indisponible (rien n\'est inventé).'), { sourceLang: 'ar', targetLang: 'fr' });
+const session = new Session({ quran: q, translation: tr });
+const cap = new AudioCapture({ onChunk: (p, t) => engine?.pushAudio(p, t), onStatus: (s, w) => diagLog(`micro : ${s} — ${w}`) });
+let engine: RecognitionEngine | null = null, running = false, engineKind = 'offline-zipformer', lastText = '', finals: string[] = [];
+const dl: string[] = []; const diagLog = (m: string) => { dl.push(new Date().toLocaleTimeString() + ' ' + m); if (dl.length > 300) dl.shift(); };
+const err = (m: string | null) => { const e = $('err'); e.hidden = !m; e.textContent = m ?? ''; if (m) diagLog('ERREUR : ' + m); };
+
+// ── Moteurs ───────────────────────────────────────────────────────────────────
+const speechOk = speechSupported();
+$<HTMLSelectElement>('engine').innerHTML =
+  `<option value="offline-zipformer">Hors ligne — Zipformer Quran-Lab (indisponible : modèle non installé)</option>
+   <option value="online-relay">En ligne — relais Basirah (clé fournisseur requise)</option>
+   <option value="quranlab-sdk">En ligne/local — TajweedFormer V4 (SDK Quran-Lab, clé requise, NON TESTÉ)</option>
+   <option value="online-test"${speechOk ? '' : ' disabled'}>En ligne — TEST navigateur (Chrome/Edge, Google)${speechOk ? '' : ' — non supporté ici'}</option>`;
+$<HTMLSelectElement>('engine').value = speechOk ? 'online-test' : 'offline-zipformer';
+engineKind = $<HTMLSelectElement>('engine').value;
+const refreshEngineHelp = () => {
+  engineKind = $<HTMLSelectElement>('engine').value;
+  $('relayBox').hidden = engineKind !== 'online-relay'; $('sdkBox').hidden = engineKind !== 'quranlab-sdk';
+  $('engineHelp').textContent = ({
+    'offline-zipformer': 'Le moteur hors ligne attend le modèle Quran-Lab (non présent). Démarrer affichera l\'erreur exacte.',
+    'online-relay': 'Renseignez l\'adresse du relais et celle du jeton (serveur Basirah). Sans eux, Démarrer refuse.',
+    'quranlab-sdk': 'SDK Quran-Lab : créez une clé web sur sdk.quranlab.ai (connexion Hugging Face) pour l\'adresse https de cette page, collez-la ci-dessous. Le SDK ouvre lui-même le micro. La sortie brute s\'affiche dans Diagnostic.',
+    'online-test': 'Moteur de TEST du navigateur : l\'audio part chez Google ; précision sur le Coran inconnue ; il s\'arrête de lui-même (relancer à la main). Ce n\'est pas le moteur Basirah.' } as Record<string, string>)[engineKind];
+};
+$('engine').onchange = refreshEngineHelp; refreshEngineHelp();
+
+async function makeEngine(): Promise<RecognitionEngine> {
+  if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
+  if (engineKind === 'online-relay') {
+    const url = $<HTMLInputElement>('relayUrl').value.trim(), tok = $<HTMLInputElement>('tokenUrl').value.trim();
+    if (!url || !tok) throw new Error('Mode en ligne (relais) : adresse du relais et adresse du jeton non renseignées. Aucun moteur en ligne n\'est configuré.');
+    return new OnlineEngine(() => new WebSocketProvider(url, async () => (await (await fetch(tok)).json()).token, { language: 'ar' }), { maxRetries: 3 });
+  }
+  if (engineKind === 'quranlab-sdk') {
+    const key = $<HTMLInputElement>('sdkKey').value.trim(); try { localStorage.setItem('qlkey', key); } catch {}
+    return new TajweedFormerEngine({ key, sdkUrl: $<HTMLInputElement>('sdkUrl').value.trim(), onRaw: c => { $('raw').textContent = JSON.stringify(c, null, 1).slice(0, 3000); } });
+  }
+  return new WebSpeechEngine();
+}
+async function start() {
+  err(null); if (running) return;
+  try {
+    const e = await makeEngine(); finals = []; lastText = '';
+    session.attachEngine(e, 'text'); e.on('state', (s, w) => { diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
+    e.on('result', r => { lastText = r.text; if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
+    engine = e; await e.load(); running = true; setBtn();
+    if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else await cap.start();
+  } catch (x) { running = false; engine = null; err((x as Error).message); setBtn(); }
+}
+async function stop() { running = false; try { await engine?.flush(); await engine?.dispose(); } catch {} if (!(engine instanceof WebSpeechEngine) && !(engine instanceof TajweedFormerEngine)) await cap.stop().catch(() => {}); engine = null; setBtn(); }
+const setBtn = () => { $('go').textContent = running ? 'Arrêter' : 'Démarrer'; $('go').classList.toggle('on', running); };
+$('go').onclick = () => running ? stop() : start();
+
+// ── Modes ─────────────────────────────────────────────────────────────────────
+let mode: Mode = 'prayer';
+document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode as Mode; session.setMode(mode);
+  document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('sel', x === b));
+  $('hifzBox').hidden = mode !== 'hifz'; $('gotoBox').hidden = mode !== 'reading'; $('trBox').hidden = mode !== 'translation';
+  render(session.view());
+});
+$('gotoBtn').onclick = () => { const s = +$<HTMLInputElement>('gs').value, a = +$<HTMLInputElement>('ga').value; if (!session.goto(s, a)) err(`${s}:${a} n'existe pas`); else err(null); };
+$('hintBtn').onclick = () => { $('hint').textContent = session.hint(3).join(' ') || '—'; };
+
+// ── Rendu ─────────────────────────────────────────────────────────────────────
+const STATUS: Record<string, string> = { idle: 'En attente', searching: 'Recherche…', tracking: 'Suivi', lost: 'Position perdue', ambiguous: 'Ambigu' };
+function render(v: SessionView) {
+  $('state').textContent = (v.engine ? `${v.engine.state}` : 'aucun moteur') + ' · ' + (STATUS[v.status] ?? v.status);
+  const p = v.position, box = $('verse');
+  if (mode === 'translation') { box.innerHTML = ''; }
+  else if (!p) box.innerHTML = '<span class="mut">Position non confirmée — récitez pour commencer.</span>';
+  else {
+    const verse = q.verses.find(x => x.s === p.surah && x.a === p.ayah)!;
+    const hs = mode === 'hifz' ? v.hifz : null;
+    box.innerHTML = `<div class="ref">${p.surah}:${p.ayah}</div><div class="ar">` + verse.words.map((w, i) => `<span class="${i < p.word ? 'done' : i === p.word ? 'cur' : ''}">${w}</span>`).join(' ') + '</div>' + (hs ? '' : '');
+  }
+  $('heard').textContent = lastText || '—';
+  $('conf').textContent = `confiance ${v.confidence.toFixed(2)} · marge ${v.margin.toFixed(2)}`;
+  const h = v.hifz; if (h) $('hifz').textContent = `ok ${h.ok} · incertain ${h.uncertain} · peut-être omis ${h.missed} · à vérifier ${h.wrong} · répétitions ${h.repeats}` + (v.stuck ? ` — Bloqué ? Indice : ${v.stuck.hint.join(' ')}` : '');
+  $('events').textContent = v.recentEvents.map(e => `${e.at.toFixed(1)}s ${e.kind}`).join(' · ') || '—';
+  if (mode === 'translation') { const s = tr.subtitles.slice(-6); $('sub').innerHTML = (tr.info().kind, '<div class="mut">' + (s.length ? '' : 'En attente de parole…') + '</div>') + s.map(x => `<div>${x.source}<br><span class="mut">${x.target ?? (x.error ?? 'traduction indisponible')}</span></div>`).join(''); }
+}
+session.onUpdate(render); tr.onUpdate(() => render(session.view()));
+setInterval(() => { if (running) session.tick((performance.now()) / 1000 - t0); }, 1000); const t0 = performance.now() / 1000;
+
+// ── Diagnostic ────────────────────────────────────────────────────────────────
+$('tabDiag').onclick = () => { $('diag').hidden = !$('diag').hidden; };
+$('micTest').onclick = async () => { try { err(null); await cap.start(); diagLog('test micro seul démarré'); } catch (x) { err('Micro : ' + (x as Error).message); } };
+$('micStop').onclick = () => cap.stop();
+setInterval(() => {
+  cap.pull(16000 * 5);
+  const s = cap.stats(); $('lvl').style.width = Math.min(100, s.rms * 600) + '%';
+  const zero = s.status === 'running' && s.maxPeak === 0 && s.silentMs > 4000;
+  $('stats').textContent = (zero ? '⚠ SILENCE NUMÉRIQUE EXACT depuis ' + (s.silentMs / 1000).toFixed(0) + ' s : le micro choisi n\'envoie aucun signal (muet, mauvais périphérique, ou bloqué par Windows/Chrome). Choisissez un autre micro ci-dessus.\n' : '') + `piste : ${s.track ? `${s.track.label} · muet=${s.track.muted} · actif=${s.track.enabled} · ${s.track.readyState} · ${s.track.settings}` : '—'}\ncrête maximale depuis le début : ${s.maxPeak.toFixed(4)}\nmicro ${s.status} · niveau ${s.rms.toFixed(4)} · crête ${s.peak.toFixed(3)} · silence ${(s.silentMs / 1000).toFixed(1)} s · fréquence ${s.sampleRate ?? '—'} Hz · autorisations ${s.permissionRequests} · flux ${s.streams} · abandonné ${s.dropped}`;
+  const v = session.view(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
+}, 500);
+$('copy').onclick = () => navigator.clipboard.writeText($('stats').textContent + '\n' + $('dlog').textContent).then(() => diagLog('rapport copié'));
+
+const FEATS: [boolean, string, string][] = [
+  [true, 'Texte du Coran, 6236 versets (Tanzil, licence à vérifier)', 'chargé dans la page'],
+  [true, 'Suivi de position (alignement mots) et modes Prière / Hifz / Lecture', 'code testé en simulation ; pas encore sur voix réelle'],
+  [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
+  [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
+  [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
+  [false, 'Hors ligne : Zipformer Quran-Lab', 'EN ATTENTE : modèle + runtime sherpa-onnx WebAssembly (voir MODEL-SETUP-QURANLAB.md)'],
+  [false, 'En ligne : relais Basirah', 'EN ATTENTE : serveur relais + clé fournisseur (voir ONLINE-PROVIDERS.md)'],
+  [false, 'Traduction arabe → français', 'EN ATTENTE : aucun traducteur branché ; rien n\'est inventé'],
+  [false, 'Reconnaissance par phonèmes', 'EN ATTENTE : lexique phonémique Quran-Lab']];
+$('feat').innerHTML = FEATS.map(([ok, n, d]) => `<div><span class="${ok ? 'ok' : 'wait'}">${ok ? '● opérationnel' : '○ en attente'}</span> — ${n}<br><small class="mut">${d}</small></div>`).join('');
+
+async function listMics() {
+  const sel = $<HTMLSelectElement>('micSel');
+  try { const d = (await navigator.mediaDevices.enumerateDevices()).filter(x => x.kind === 'audioinput'); sel.innerHTML = d.map(x => `<option value="${x.deviceId}">${x.label || '(autoriser le micro pour voir les noms)'}</option>`).join(''); diagLog(`${d.length} micro(s) détecté(s)`); }
+  catch (x) { err('Liste des micros : ' + (x as Error).message); }
+}
+$('micList').onclick = listMics;
+$<HTMLSelectElement>('micSel').onchange = async () => { cap.deviceId = $<HTMLSelectElement>('micSel').value || null; if (cap.stats().status === 'running') { await cap.stop(); await cap.start().catch(x => err('Micro : ' + (x as Error).message)); } };
+$('micTest').addEventListener('click', () => setTimeout(listMics, 800));
+
+try { const k = localStorage.getItem('qlkey'); if (k) $<HTMLInputElement>('sdkKey').value = k; } catch {}

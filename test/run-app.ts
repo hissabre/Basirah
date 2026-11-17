@@ -1,0 +1,68 @@
+// Tests de la composition (Basirah), des ports, de la config et des garde-fous de licence. TOUT est simulé : moteurs de rejeu, source audio en tableau.
+import { readFileSync } from 'node:fs';
+import { QuranDB } from '../src/quran/db.ts';
+import { Basirah } from '../src/app/basirah.ts';
+import { ReplayEngine } from '../src/engine/replay.ts';
+import type { Platform, AudioSourcePort } from '../src/platform/ports.ts';
+import { openQuran, type QuranSourceDescriptor } from '../src/licensing/quran-source.ts';
+import { commercialBlockers, type Inventory } from '../src/licensing/inventory.ts';
+import { validateConfig, unresolved, PLACEHOLDER } from '../src/config.ts';
+
+let pass = 0, fail = 0;
+const t = (n: string, ok: boolean, i = '') => { ok ? pass++ : fail++; console.log((ok ? '  ✓ ' : '  ✗ ') + n + (i ? '  — ' + i : '')); };
+const raw = JSON.parse(readFileSync(new URL('../data/quran-hafs-uthmani.json', import.meta.url), 'utf8'));
+const q = new QuranDB(raw);
+const vs: any[] = raw.verses ?? raw; const words: string[] = vs.find((v: any) => v[0] === 2 && v[1] === 255)[2].split(' ').slice(0, 12);
+
+class ArraySource implements AudioSourcePort {
+  cb: (p: Float32Array, t: number) => void = () => {}; st: (s: any, w: string) => void = () => {};
+  async start() {} async stop() {} onChunk(cb: any) { this.cb = cb; } onStatus(cb: any) { this.st = cb; }
+  feed(sec: number, at: number) { this.cb(new Float32Array(Math.round(16000 * sec)), at); }
+}
+const script = (_at: number, ws: string[]) => [4, 6, 8, 10, 12].map((n, i) => ({ at: i + 1, result: { text: ws.slice(0, n).join(' '), unit: 'text' as const, language: 'ar', audioStart: 0, audioEnd: i + 1, isFinal: i === 4, confidence: null } }));
+
+console.log('\n[Basirah — sélection explicite, pas de bascule silencieuse]');
+{
+  const src = new ArraySource(); const sugg: string[] = [], errs: string[] = [];
+  const off = new ReplayEngine(script(2, words), 'off'), on = new ReplayEngine([], 'on');
+  const p: Platform = { audio: src, engines: { offline: async () => ({ engine: off, unit: 'text' }), online: async () => ({ engine: on, unit: 'text' }) } };
+  const b = new Basirah(p, { quran: q }, { suggestion: m => sugg.push(m), error: m => errs.push(m) });
+  b.setMode('prayer');
+  t('aucun moteur au départ', b.activeKind === null);
+  t('sélection hors ligne OK', await b.selectEngine('offline') && b.activeKind === 'offline');
+  await b.start(); for (let i = 0; i < 6; i++) src.feed(1, i);
+  const v1 = b.session.view();
+  t('l’audio atteint le moteur actif et la position avance', !!v1.position && v1.position.surah === 2, JSON.stringify(v1.position));
+  const pos = v1.position;
+  t('passage en ligne explicite : position conservée', await b.selectEngine('online') && b.activeKind === 'online' && JSON.stringify(b.session.view().position) === JSON.stringify(pos));
+  t('aucune suggestion ni erreur sans panne', sugg.length === 0 && errs.length === 0);
+  const p2: Platform = { audio: new ArraySource(), engines: {} };
+  const b2 = new Basirah(p2, { quran: q }, { error: m => errs.push(m) });
+  t('moteur absent sur la plateforme → refus clair, pas de repli', !(await b2.selectEngine('online')) && errs.length === 1 && b2.activeKind === null);
+  const bad: Platform = { audio: new ArraySource(), engines: { offline: async () => ({ engine: { ...off, load: async () => { throw new Error('modèle introuvable'); } } as any, unit: 'text' }) } };
+  const b3 = new Basirah(bad, { quran: q }, { error: m => errs.push(m) });
+  t('échec de chargement → erreur dite, aucun moteur actif', !(await b3.selectEngine('offline')) && b3.activeKind === null && /modèle introuvable/.test(errs[errs.length - 1]));
+}
+
+console.log('\n[Licences — garde-fous]');
+{
+  const d: QuranSourceDescriptor = { id: 'x', riwaya: 'hafs', origin: 'o', status: 'unverified', commercialOk: null, evidence: null, attribution: '' };
+  t('texte non vérifié : build interne autorisé', !!openQuran(raw, d, 'internal'));
+  let msg = ''; try { openQuran(raw, d, 'commercial'); } catch (e) { msg = (e as Error).message; }
+  t('texte non vérifié : build commercial REFUSÉ', /non autorisée/.test(msg));
+  try { openQuran(raw, { ...d, status: 'cleared', commercialOk: true, evidence: null }, 'commercial'); msg = ''; } catch (e) { msg = (e as Error).message; }
+  t('« cleared » sans preuve : refusé', /non autorisée/.test(msg));
+  t('cleared + commercialOk + preuve : accepté', !!openQuran(raw, { ...d, status: 'cleared', commercialOk: true, evidence: 'lettre du 2026-11-20' }, 'commercial'));
+  const inv: Inventory = { components: [{ id: 'a', kind: 'k', origin: 'o', status: 'cleared', evidence: 'e', needs: ['commercial'], notes: '' }, { id: 'b', kind: 'k', origin: 'o', status: 'unverified', evidence: null, needs: ['commercial'], notes: '' }, { id: 'c', kind: 'k', origin: 'o', status: 'cleared', evidence: null, needs: ['commercial'], notes: '' }] };
+  t('inventaire : bloque non vérifié et « cleared » sans preuve', commercialBlockers(inv).map(c => c.id).sort().join() === 'b,c');
+}
+
+console.log('\n[Config]');
+{
+  const ex = JSON.parse(readFileSync(new URL('../config/basirah.config.example.json', import.meta.url), 'utf8'));
+  t('l’exemple contient des placeholders à renseigner', unresolved(ex).length > 0, unresolved(ex).slice(0, 3).join(', '));
+  t('placeholder reconnu', unresolved({ a: { b: PLACEHOLDER } }).join() === 'a.b');
+  const bad = JSON.parse(JSON.stringify(ex)); (bad.behaviour ??= {}).autoFallbackToOffline = true;
+  t('autoFallbackToOffline=true refusé', validateConfig(bad).length > 0);
+}
+console.log(`\n${pass} réussis, ${fail} échoués`); process.exit(fail ? 1 : 0);

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Basirah — Diagnostic micro</title>
+<style>
+:root{--bg:#0b141d;--card:#122130;--tx:#e8f1f5;--mut:#8aa0ad;--ok:#37d67a;--bad:#ff6b6b;--warn:#ffc857;--acc:#1fe3d6}
+@media (prefers-color-scheme:light){:root{--bg:#f4f7f8;--card:#fff;--tx:#10222d;--mut:#586b77;--ok:#168a4a;--bad:#c62828;--warn:#9a6700;--acc:#00857d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,Segoe UI,sans-serif;padding:16px;max-width:900px;margin-inline:auto}
+h1{font-size:20px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin:0 0 12px}
+button{font:inherit;border:0;border-radius:10px;padding:10px 16px;background:var(--acc);color:#001;font-weight:600;cursor:pointer}
+button.g{background:transparent;color:var(--tx);border:1px solid var(--mut)}button:disabled{opacity:.4}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse}td{padding:5px 4px;border-bottom:1px solid #8883}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:14px;background:#8883;border-radius:7px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc);width:0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+#log{max-height:240px;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.big{font-size:26px;font-variant-numeric:tabular-nums}
+</style></head><body>
+<h1>Basirah — Diagnostic micro</h1>
+<p class="s">Vérifie que le micro reste actif, avec UNE seule autorisation et UN seul flux, pendant la durée choisie. Rien n'est envoyé : tout reste dans cette page.</p>
+<div class="card"><div class="row">
+ <label>Durée du test <select id="dur"><option value="60">1 min (essai)</option><option value="600">10 min</option><option value="1800" selected>30 min</option><option value="3600">60 min</option></select></label>
+ <label><input type="checkbox" id="wake" checked> garder l'écran allumé</label>
+ <button id="go">Démarrer le test</button><button id="stop" class="g" disabled>Arrêter</button><button id="exp" class="g" disabled>Exporter le rapport</button>
+</div><p class="s" style="margin:10px 0 0">Pendant le test : changez d'onglet 1 minute, puis revenez ; vous pouvez aussi débrancher/rebrancher le micro. Chaque événement est journalisé.</p></div>
+<div class="card"><div class="big" id="clock">00:00 / 00:00</div><div class="bar" style="margin:8px 0"><i id="lvl"></i></div>
+<table><tbody>
+<tr><td>État de la capture</td><td id="st">arrêtée</td></tr>
+<tr><td>Demandes d'autorisation du micro (attendu : 1)</td><td id="perm">0</td></tr>
+<tr><td>Flux micro ouverts (attendu : 1)</td><td id="streams">0</td></tr>
+<tr><td>Taux d'échantillonnage du contexte audio</td><td id="sr">—</td></tr>
+<tr><td>Niveau (RMS) · crête</td><td id="rms">—</td></tr>
+<tr><td>Silence continu</td><td id="sil">—</td></tr>
+<tr><td>Tampon · échantillons abandonnés (attendu : 0)</td><td id="buf">—</td></tr>
+<tr><td>Dérive audio/horloge (attendu : &lt; 1 %)</td><td id="drift">—</td></tr>
+<tr><td>Plus long intervalle entre 2 blocs audio (attendu : &lt; 500 ms)</td><td id="gap">—</td></tr>
+<tr><td>Interruptions / suspensions détectées (attendu : 0)</td><td id="intr">0</td></tr>
+<tr><td>Onglet masqué : fois · durée cumulée</td><td id="hid">0</td></tr>
+</tbody></table></div>
+<div class="card"><b>Verdict</b><div id="verdict" class="warn" style="margin-top:6px">Test non démarré.</div></div>
+<div class="card"><b>Journal</b><div id="log"></div></div>
+<script>
+%%CODE%%
+const $=id=>document.getElementById(id);const T0=performance.now();
+let cap=null,run=false,t0=0,chunks=0,lastChunk=0,maxGap=0,audioSec=0,intr=0,hidN=0,hidMs=0,hidAt=0,wl=null,timer=null,samples=[],logs=[],lastStats=null,statusEvents=[],ended=null;
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+const log=(m,k)=>{const t=((performance.now()-T0)/1000).toFixed(1).padStart(7);logs.push({t:+((performance.now()-T0)/1000).toFixed(2),m});const d=document.createElement('div');d.textContent=t+' s  '+m;if(k)d.className=k;$('log').appendChild(d);$('log').scrollTop=1e9;try{localStorage.setItem('bsr-diag-log',JSON.stringify(logs.slice(-400)))}catch(e){}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){hidAt=performance.now();hidN++;log('onglet masqué','warn')}else{hidMs+=performance.now()-hidAt;log('onglet de nouveau visible ('+((performance.now()-hidAt)/1000).toFixed(1)+' s)')}});
+try{navigator.mediaDevices.addEventListener('devicechange',()=>log('changement de périphériques audio détecté','warn'))}catch(e){}
+function paint(){if(!cap)return;if(run)cap.pull(1e7);/* la page vide le tampon comme le ferait un moteur : « abandonnés » = vrai retard */const s=cap.stats();lastStats=s;const el=run?(performance.now()-t0)/1000:0;
+ $('st').textContent=s.status;$('perm').textContent=s.permissionRequests;$('streams').textContent=s.streams;$('sr').textContent=s.sampleRate?s.sampleRate+' Hz':'—';
+ $('rms').textContent=s.rms.toFixed(4)+' · '+s.peak.toFixed(3);$('lvl').style.width=Math.min(100,Math.sqrt(s.rms)*160)+'%';$('sil').textContent=(s.silentMs/1000).toFixed(1)+' s';
+ $('buf').textContent=(s.buffered/16000).toFixed(2)+' s · '+s.dropped;
+ const dr=el>5?Math.abs(audioSec-el)/el*100:null;$('drift').textContent=dr===null?'—':dr.toFixed(2)+' %';$('gap').textContent=Math.round(maxGap)+' ms';
+ $('intr').textContent=intr;$('hid').textContent=hidN+' · '+fmt((hidMs+(document.hidden?performance.now()-hidAt:0))/1000);
+ const dur=+$('dur').value;$('clock').textContent=fmt(el)+' / '+fmt(dur);
+ if(run&&Math.round(el)%10===0&&(!samples.length||samples[samples.length-1].t!==Math.round(el)))samples.push({t:Math.round(el),rms:+s.rms.toFixed(5),audioSec:+audioSec.toFixed(2),buffered:s.buffered,dropped:s.dropped,status:s.status,perm:s.permissionRequests,streams:s.streams});
+ verdict(el,dr);if(run&&el>=dur)finish('durée atteinte')}
+function verdict(el,dr){const s=lastStats;if(!s)return;const checks=[
+ ['une seule demande d\'autorisation',s.permissionRequests===1],['un seul flux micro',s.streams===1],['aucune interruption',intr===0],
+ ['aucun échantillon abandonné',s.dropped===0],['dérive < 1 %',dr===null||dr<1],['aucun trou > 500 ms',maxGap<500],['son capté (niveau non nul)',samples.some(x=>x.rms>0.0005)||s.rms>0.0005]];
+ const bad=checks.filter(c=>!c[1]).map(c=>c[0]);const done=ended!==null;
+ const dur=+$('dur').value;const full=el>=dur-1;
+ const v=$('verdict');if(!run&&!done){return}
+ if(bad.length){v.className='bad';v.textContent=(done?'ÉCHEC : ':'Anomalie en cours : ')+bad.join(' · ')}
+ else if(done&&full){v.className='ok';v.textContent='RÉUSSI : '+fmt(el)+' sans interruption, 1 autorisation, 1 flux, dérive '+(dr===null?'—':dr.toFixed(2)+' %')+'.'}
+ else{v.className='warn';v.textContent=done?'Test arrêté avant la durée prévue ('+fmt(el)+').':'En cours — aucune anomalie pour l\'instant.'}}
+async function start(){if(run)return;$('go').disabled=true;
+ cap=new AudioCapture({onChunk:(pcm,st)=>{const n=performance.now();if(lastChunk&&run)maxGap=Math.max(maxGap,n-lastChunk);lastChunk=n;audioSec+=pcm.length/16000;chunks++},
+  onStatus:(s,why)=>{statusEvents.push({t:+((performance.now()-T0)/1000).toFixed(2),s,why});log('capture : '+s+' — '+why,(s==='interrupted'||s==='suspended')?'bad':'');if(s==='interrupted'||s==='suspended')intr++}});
+ try{await cap.start()}catch(e){log('échec du démarrage : '+e.name+' — '+e.message,'bad');$('go').disabled=false;$('verdict').className='bad';$('verdict').textContent='Micro refusé ou indisponible ('+e.name+').';return}
+ run=true;ended=null;t0=performance.now();audioSec=0;maxGap=0;lastChunk=0;intr=0;samples=[];$('stop').disabled=false;$('exp').disabled=true;
+ if($('wake').checked&&navigator.wakeLock){try{wl=await navigator.wakeLock.request('screen');log('écran maintenu allumé');wl.addEventListener('release',()=>log('verrou d\'écran libéré par le système','warn'))}catch(e){log('verrou d\'écran refusé : '+e.name,'warn')}}
+ timer=setInterval(paint,500);log('test démarré ('+fmt(+$('dur').value)+')')}
+async function finish(why){if(!run)return;run=false;ended=why;clearInterval(timer);paint();const el=(performance.now()-t0)/1000;await cap.stop();try{wl&&wl.release()}catch(e){}
+ log('test terminé : '+why+' ('+fmt(el)+')');$('stop').disabled=true;$('go').disabled=false;$('exp').disabled=false;lastStats=cap.stats();verdict(el,Math.abs(audioSec-el)/Math.max(1,el)*100)}
+$('go').onclick=start;$('stop').onclick=()=>finish('arrêt manuel');
+$('exp').onclick=()=>{const el=(performance.now()-t0)/1000;const r={tool:'basirah-mic-diagnostic',version:1,userAgent:navigator.userAgent,planned:+$('dur').value,elapsedSec:+el.toFixed(1),finalStats:lastStats,audioSecReceived:+audioSec.toFixed(2),driftPct:+(Math.abs(audioSec-el)/Math.max(1,el)*100).toFixed(3),maxChunkGapMs:Math.round(maxGap),interruptions:intr,tabHidden:{count:hidN,totalMs:Math.round(hidMs)},statusEvents,samples,log:logs,verdict:$('verdict').textContent,ended};
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(r,null,1)],{type:'application/json'}));a.download='basirah-diagnostic-micro-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
+window.__diag={get cap(){return cap},stats:()=>({lastStats,audioSec,maxGap,intr,hidN,samples,logs,statusEvents,ended,chunks})};
+</script></body></html>
