@@ -29,7 +29,7 @@ export class WebSpeechEngine implements RecognitionEngine {
     r.onend = () => {
       const heard = this.ev.includes('audiostart'), sound = this.ev.includes('soundstart');
       this.st('idle', `session terminée par le navigateur (événements : ${this.ev.join(', ') || 'aucun'}; résultats : ${this.n}). ` +
-        (!heard ? 'Chrome n\'a JAMAIS reçu d\'audio : micro par défaut de Chrome muet, bloqué ou occupé — vérifier chrome://settings/content/microphone et le micro par défaut de Windows. ' : !sound ? 'Chrome a ouvert le micro mais n\'a détecté aucun son : micro muet ou niveau nul. ' : '') + 'Appuyez sur Démarrer pour reprendre (pas de redémarrage automatique).');
+        (!heard && this.n === 0 ? 'Chrome n\'a JAMAIS reçu d\'audio : micro par défaut de Chrome muet, bloqué ou occupé — vérifier chrome://settings/content/microphone et le micro par défaut de Windows. '   : !sound && this.n === 0 ? 'Chrome a ouvert le micro mais n\'a détecté aucun son : micro muet ou niveau nul. ' : '') + 'Appuyez sur Démarrer pour reprendre (pas de redémarrage automatique).');
     };
     try { r.start(); } catch (e) { this.st('error', 'démarrage impossible : ' + (e as Error).message); }
   }
