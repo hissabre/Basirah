@@ -15,7 +15,7 @@ const tr = new TranslationPipeline(new UnavailableTranslator('offline', 'aucun',
 const session = new Session({ quran: q, translation: tr });
 const cap = new AudioCapture({ onChunk: (p, t) => engine?.pushAudio(p, t), onStatus: (s, w) => diagLog(`micro : ${s} — ${w}`) });
 let engine: RecognitionEngine | null = null, running = false, engineKind = 'offline-zipformer', lastText = '', finals: string[] = [];
-const tl: string[] = []; let tStart = performance.now(); let lastKey = '';
+const tl: string[] = []; let tStart = performance.now(); let lastKey = '', lastLive = '';
 const tlog = (m: string) => { tl.push(((performance.now() - tStart) / 1000).toFixed(1).padStart(6) + ' s  ' + m); if (tl.length > 400) tl.shift(); };
 const dl: string[] = []; const diagLog = (m: string) => { dl.push(new Date().toLocaleTimeString() + ' ' + m); if (dl.length > 300) dl.shift(); };
 const err = (m: string | null) => { const e = $('err'); e.hidden = !m; e.textContent = m ?? ''; if (m) diagLog('ERREUR : ' + m); };
@@ -76,6 +76,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b => b.oncli
   render(session.view());
 });
 $('gotoBtn').onclick = () => { const s = +$<HTMLInputElement>('gs').value, a = +$<HTMLInputElement>('ga').value; if (!session.goto(s, a)) err(`${s}:${a} n'existe pas`); else err(null); };
+$<HTMLSelectElement>('react').onchange = () => session.setReactivity($<HTMLSelectElement>('react').value === 'fast');
 $('hintBtn').onclick = () => { $('hint').textContent = session.hint(3).join(' ') || '—'; };
 
 // ── Rendu ─────────────────────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ function render(v: SessionView) {
   else {
     const verse = q.verses.find(x => x.s === p.surah && x.a === p.ayah)!;
     const hs = mode === 'hifz' ? v.hifz : null;
-    box.innerHTML = `<div class="ref">${p.surah}:${p.ayah}</div><div class="ar">` + verse.words.map((w, i) => `<span class="${i < p.word ? 'done' : i === p.word ? 'cur' : ''}">${w}</span>`).join(' ') + '</div>' + (hs ? '' : '');
+    box.innerHTML = `<div class="ref">${p.surah}:${p.ayah}</div><div class="ar">` + verse.words.map((w, i) => `<span class="${i < p.word ? 'done' : i === p.word ? 'cur' : (v.live && v.live.surah === p.surah && v.live.ayah === p.ayah && i === v.live.word ? 'lv' : '')}">${w}</span>`).join(' ') + '</div>' + (hs ? '' : '');
   }
   $('heard').textContent = lastText ? (lastText.length > 160 ? '… ' + lastText.slice(-160) : lastText) : '—';
   $('conf').textContent = `confiance ${v.confidence.toFixed(2)} · marge ${v.margin.toFixed(2)}`;
@@ -96,7 +97,7 @@ function render(v: SessionView) {
   $('events').textContent = v.recentEvents.map(e => `${e.at.toFixed(1)}s ${e.kind}`).join(' · ') || '—';
   if (mode === 'translation') { const s = tr.subtitles.slice(-6); $('sub').innerHTML = (tr.info().kind, '<div class="mut">' + (s.length ? '' : 'En attente de parole…') + '</div>') + s.map(x => `<div>${x.source}<br><span class="mut">${x.target ?? (x.error ?? 'traduction indisponible')}</span></div>`).join(''); }
 }
-session.onUpdate(v => { const k = v.position ? `${v.position.surah}:${v.position.ayah}/${v.position.word}` : '-'; if (k !== lastKey) { lastKey = k; tlog(`POSITION → ${k} (${v.status})`); } render(v); }); tr.onUpdate(() => render(session.view()));
+session.onUpdate(v => { const lk = v.live ? `${v.live.surah}:${v.live.ayah}/${v.live.word}` : '-'; if (lk !== lastLive) { lastLive = lk; tlog(`live → ${lk}`); } const k = v.position ? `${v.position.surah}:${v.position.ayah}/${v.position.word}` : '-'; if (k !== lastKey) { lastKey = k; tlog(`POSITION → ${k} (${v.status})`); } render(v); }); tr.onUpdate(() => render(session.view()));
 setInterval(() => { if (running) session.tick((performance.now()) / 1000 - t0); }, 1000); const t0 = performance.now() / 1000;
 
 // ── Diagnostic ────────────────────────────────────────────────────────────────
@@ -134,3 +135,5 @@ $<HTMLSelectElement>('micSel').onchange = async () => { cap.deviceId = $<HTMLSel
 $('micTest').addEventListener('click', () => setTimeout(listMics, 800));
 
 try { const k = localStorage.getItem('qlkey'); if (k) $<HTMLInputElement>('sdkKey').value = k; } catch {}
+
+try { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').then(() => diagLog('hors ligne : page mise en cache (service worker actif)')).catch(e => diagLog('service worker impossible : ' + e.message)); } catch {}

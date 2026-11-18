@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Basirah — test</title>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Basirah — test</title><link rel="manifest" href="manifest.webmanifest">
 <style>
 :root{--bg:#f6f3ec;--fg:#1f2a24;--mut:#6b756e;--card:#fffdf8;--ln:#ddd6c6;--ac:#1d6b52;--warn:#a33}
 @media(prefers-color-scheme:dark){:root{--bg:#10171a;--fg:#e8e6df;--mut:#97a39b;--card:#172127;--ln:#2b3a40;--ac:#4cc29a;--warn:#ff8a80}}
@@ -7,7 +7,7 @@ main{max-width:760px;margin:0 auto;padding:16px}h1{font-size:1.2rem;margin:0 0 4
 .row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}button,select,input{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--card);color:var(--fg)}
 button{cursor:pointer}button.sel,button.on{background:var(--ac);color:#fff;border-color:var(--ac)}select{flex:1;min-width:0}
 .card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin:10px 0}
-.ar{font:2rem/2.4 "Amiri","Traditional Arabic",serif;direction:rtl;text-align:right}.ar .done{color:var(--mut)}.ar .cur{background:color-mix(in srgb,var(--ac) 25%,transparent);border-radius:6px;padding:0 4px}
+.ar{font:2rem/2.4 "Amiri","Traditional Arabic",serif;direction:rtl;text-align:right}.ar .done{color:var(--mut)}.ar .lv{text-decoration:underline dotted;text-underline-offset:6px}.ar .cur{background:color-mix(in srgb,var(--ac) 25%,transparent);border-radius:6px;padding:0 4px}
 .ref{font-size:.85rem;color:var(--mut)}#err{background:color-mix(in srgb,var(--warn) 14%,var(--card));border:1px solid var(--warn);border-radius:10px;padding:10px;margin:10px 0}
 #heard{direction:rtl;text-align:right;font-size:1.2rem}pre{white-space:pre-wrap;font-size:.78rem;max-height:260px;overflow:auto}.meter{height:8px;background:var(--ln);border-radius:4px}.meter div{height:100%;background:var(--ac);width:0;border-radius:4px}
 .ok{color:var(--ac)}.wait{color:var(--warn)}#feat div{padding:4px 0;border-bottom:1px solid var(--ln);font-size:.9rem}
@@ -17,6 +17,7 @@ input[type=number]{width:80px}
 <div class="row" role="tablist">
 <button data-mode="prayer" class="sel">Prière</button><button data-mode="hifz">Hifz</button><button data-mode="reading">Lecture</button><button data-mode="translation">Traduction</button></div>
 <div class="row"><select id="engine" aria-label="Moteur"></select><button id="go">Démarrer</button></div>
+<div class="row"><select id="react" aria-label="Réactivité"><option value="safe">Réactivité : sûre (2 accords)</option><option value="fast">Réactivité : rapide (dernier mot retenu) — à comparer</option></select></div>
 <div class="mut"><small id="engineHelp"></small></div>
 <div id="relayBox" class="row" hidden><input id="relayUrl" placeholder="wss://…/relais" style="flex:1"><input id="tokenUrl" placeholder="https://…/jeton" style="flex:1"></div>
 <div id="sdkBox" class="row" hidden><input id="sdkKey" placeholder="clé web qlk_v1_…" style="flex:1" autocomplete="off"><input id="sdkUrl" value="https://cdn.jsdelivr.net/npm/@quran-lab/tajweedformer@3.1.6/+esm" style="flex:2"></div>

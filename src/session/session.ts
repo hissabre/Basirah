@@ -14,6 +14,8 @@ export interface SessionView {
   position: { surah: number; ayah: number; word: number; index: number } | null;
   confidence: number; margin: number;
   engine: { id: string; kind: string; state: RecognizerState | 'none'; unit: 'text' | 'phoneme' | null } | null;
+  /** Meilleure hypothèse courante, NON confirmée (affichage provisoire, plus rapide que la position confirmée). */
+  live: { surah: number; ayah: number; word: number; index: number } | null;
   recentEvents: (AlignEvent & { at: number })[];
   hifz: ReturnType<HifzTracker['summary']> | null; stuck: { hint: string[] } | null;
 }
@@ -28,7 +30,9 @@ export class Session {
   readonly log: LogLine[] = [];
   readonly hifz: HifzTracker;
   private wordAl: Aligner; private phAl: Aligner | null;
-  private stab = new Stabilizer(2);
+  private stab = new Stabilizer(2); private liveP: SessionView['position'] = null;
+  /** Réactivité : false = sûre (2 hypothèses d'accord), true = rapide (tous les mots sauf le dernier). */
+  setReactivity(fast: boolean) { this.stab = new Stabilizer(2, fast); this.note('réactivité : ' + (fast ? 'rapide' : 'sûre')); this.emit(); }
   private engine: RecognitionEngine | null = null; private engState: RecognizerState | 'none' = 'none'; private unit: 'text' | 'phoneme' | null = null;
   private pos: SessionView['position'] = null; private status: AlignStatus | 'idle' = 'idle'; private conf = 0; private margin = 0;
   private events: (AlignEvent & { at: number })[] = []; private stuck: { hint: string[] } | null = null; private clock = 0;
@@ -54,7 +58,7 @@ export class Session {
   reset() {
     this.wordAl = new Aligner(this.d.quran, 'prayer'); this.phAl = this.d.phoneme ? new Aligner(this.d.phoneme, 'phoneme') : null;
     if (this.mode !== 'translation') this.wordAl.setProfile((this.mode === 'prayer' ? 'prayer' : this.mode === 'hifz' ? 'hifz' : 'reading') as ProfileName);
-    this.pos = null; this.status = 'idle'; this.conf = 0; this.margin = 0; this.events = []; this.stuck = null; this.stab.reset(); this.note('nouvelle prise : position remise à zéro'); this.emit();
+    this.pos = null; this.liveP = null; this.status = 'idle'; this.conf = 0; this.margin = 0; this.events = []; this.stuck = null; this.stab.reset(); this.note('nouvelle prise : position remise à zéro'); this.emit();
   }
   /** Navigation manuelle (Lecture) ou reprise : fixe la position sans perdre le suivi. */
   goto(surah: number, ayah: number, word = 0) {
@@ -86,6 +90,7 @@ export class Session {
     for (const ev of st.events) { this.events.push({ ...ev, at: r.audioEnd }); if (this.events.length > 30) this.events.shift(); }
     if (st.position) this.pos = phon ? this.fromPhoneme(st.position.index) : this.d.quran.position(st.position.index);
     this.status = st.status; this.conf = st.confidence; this.margin = st.margin;
+    this.liveP = st.live ? (phon ? this.fromPhoneme(st.live.index) : this.d.quran.position(st.live.index)) : null;
     const tr = al.drainTrace();
     if (!phon && this.mode === 'hifz') { this.hifz.consume(tr, r.audioEnd); this.stuck = null; }
     this.emit();
@@ -103,7 +108,7 @@ export class Session {
   hint(n = 3): string[] { return this.pos ? this.hifz.next(this.pos.index, n) : []; }
 
   view(): SessionView {
-    return { mode: this.mode, status: this.status, position: this.pos, confidence: this.conf, margin: this.margin,
+    return { mode: this.mode, status: this.status, position: this.pos, live: this.liveP, confidence: this.conf, margin: this.margin,
       engine: this.engine ? { id: this.engine.id, kind: this.engine.kind, state: this.engState, unit: this.unit } : null,
       recentEvents: this.events.slice(-8), hifz: this.mode === 'hifz' ? this.hifz.summary() : null, stuck: this.stuck };
   }

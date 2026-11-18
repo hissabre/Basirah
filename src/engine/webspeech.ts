@@ -8,20 +8,22 @@ import type { RecognitionEngine, RecognizerEvents, RecognitionResult, Recognizer
 export const speechSupported = () => typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 export class WebSpeechEngine implements RecognitionEngine {
   readonly kind = 'online' as const; readonly id = 'browser-speech:ar-SA (test)';
-  private fns: { [K in keyof RecognizerEvents]?: RecognizerEvents[K][] } = {}; private rec: any = null; private t0 = 0; private n = 0; private ev: string[] = [];
+  private fns: { [K in keyof RecognizerEvents]?: RecognizerEvents[K][] } = {}; private rec: any = null; private t0 = 0; private n = 0; private ev: string[] = []; private starts = new Map<number, number>();
   on<K extends keyof RecognizerEvents>(ev: K, fn: RecognizerEvents[K]) { (this.fns[ev] ??= [] as never).push(fn as never); }
   private st(s: RecognizerState, why: string) { (this.fns.state as ((s: string, w: string) => void)[] | undefined)?.forEach(f => f(s, why)); }
   async load() { if (!speechSupported()) { this.st('error', 'reconnaissance vocale du navigateur absente (utiliser Chrome ou Edge)'); throw new Error('webkitSpeechRecognition indisponible'); } this.st('idle', 'prêt'); }
   begin() {
     const C = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition; const r = this.rec = new C();
     r.lang = 'ar-SA'; r.continuous = true; r.interimResults = true; this.t0 = performance.now(); this.st('requesting-mic', 'demande du micro');
-    this.ev = []; const mark = (k: string) => { this.ev.push(k); };
+    this.ev = []; this.starts.clear(); const mark = (k: string) => { this.ev.push(k); };
     for (const k of ['audiostart', 'soundstart', 'speechstart', 'speechend', 'soundend', 'audioend', 'nomatch']) r['on' + k] = () => mark(k);
     r.onstart = () => this.st('listening', 'session ouverte');
     r.onresult = (e: any) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const a = e.results[i], now = (performance.now() - this.t0) / 1000;
-        const res: RecognitionResult = { text: a[0].transcript, unit: 'text', language: 'ar', audioStart: Math.max(0, now - 2), audioEnd: now, receivedAt: performance.now(), isFinal: a.isFinal, confidence: a.isFinal && a[0].confidence ? a[0].confidence : null, engine: 'online', engineId: this.id };
+        // L'heure de début doit être STABLE pour toutes les hypothèses d'un même segment : c'est la clé du Stabilizer.
+        if (!this.starts.has(i)) this.starts.set(i, now);
+        const res: RecognitionResult = { text: a[0].transcript, unit: 'text', language: 'ar', audioStart: this.starts.get(i)!, audioEnd: now, receivedAt: performance.now(), isFinal: a.isFinal, confidence: a.isFinal && a[0].confidence ? a[0].confidence : null, engine: 'online', engineId: this.id };
         this.n++; (this.fns.result as ((r: RecognitionResult) => void)[] | undefined)?.forEach(f => f(res));
       }
     };

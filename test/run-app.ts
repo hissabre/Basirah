@@ -44,6 +44,35 @@ console.log('\n[Basirah — sélection explicite, pas de bascule silencieuse]');
   t('échec de chargement → erreur dite, aucun moteur actif', !(await b3.selectEngine('offline')) && b3.activeKind === null && /modèle introuvable/.test(errs[errs.length - 1]));
 }
 
+console.log('\n[Moteur du navigateur — la position doit avancer PENDANT les résultats provisoires]');
+{
+  const { WebSpeechEngine } = await import('../src/engine/webspeech.ts');
+  const { Session } = await import('../src/session/session.ts');
+  let inst: any; (globalThis as any).window = globalThis;
+  (globalThis as any).webkitSpeechRecognition = class { constructor() { inst = this; } start() { this.onstart?.(); } stop() {} abort() {} };
+  const realNow = performance.now.bind(performance); let fake = 5000; (performance as any).now = () => fake;
+  const eng = new WebSpeechEngine(); const sess = new Session({ quran: q }); sess.setMode('prayer'); sess.attachEngine(eng, 'text'); await eng.load(); eng.begin();
+  const w = words; let firstPosAt = -1, finals = 0;
+  for (let n = 3; n <= w.length; n++) {
+    fake += 400;
+    inst.onresult({ resultIndex: 0, results: [Object.assign([{ transcript: w.slice(0, n).join(' '), confidence: 0.9 }], { isFinal: false })] });
+    if (firstPosAt < 0 && sess.view().position) firstPosAt = n;
+  }
+  (performance as any).now = realNow;
+  t('position confirmée AVANT tout résultat final', firstPosAt > 0 && finals === 0, `dès ${firstPosAt} mots sur ${w.length}, 0 résultat final`);
+}
+
+console.log('\n[Réactivité rapide : verrouille plus tôt que la sûre]');
+{
+  const { Session } = await import('../src/session/session.ts');
+  const lock = (fast: boolean) => { const se = new Session({ quran: q }); se.setMode('prayer'); se.setReactivity(fast); let at = -1, liveAt = -1;
+    for (let n = 3; n <= words.length; n++) { se.onResult({ text: words.slice(0, n).join(' '), unit: 'text', language: 'ar', audioStart: 1, audioEnd: n * 0.4, receivedAt: 0, isFinal: false, confidence: null, engine: 'online', engineId: 'x' });
+      const v = se.view(); if (at < 0 && v.position) at = n; if (liveAt < 0 && v.live) liveAt = n; } return { at, liveAt }; };
+  const s = lock(false), f = lock(true);
+  t('mode rapide : position confirmée au plus tard aussi tôt que le mode sûr', f.at > 0 && f.at <= s.at, `rapide ${f.at} mots · sûr ${s.at} mots`);
+  t('hypothèse provisoire (live) disponible dès les premiers mots', f.liveAt > 0 && f.liveAt <= 4, `dès ${f.liveAt} mots`);
+}
+
 console.log('\n[Licences — garde-fous]');
 {
   const d: QuranSourceDescriptor = { id: 'x', riwaya: 'hafs', origin: 'o', status: 'unverified', commercialOk: null, evidence: null, attribution: '' };
