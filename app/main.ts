@@ -5,6 +5,9 @@ import { OnlineEngine } from '../src/engine/online.ts';
 import { WebSocketProvider } from '../src/engine/ws-provider.ts';
 import { WebSpeechEngine, speechSupported } from '../src/engine/webspeech.ts';
 import { TajweedFormerEngine } from '../src/engine/tajweedformer.ts';
+import { WhisperEngine, spawnWhisperWorker } from '../src/engine/whisper.ts';
+import { WHISPER_WORKER_SRC } from '../src/engine/whisper-worker-src.ts';
+import { skeleton } from '../src/quran/normalize.ts';
 import { TranslationPipeline, UnavailableTranslator } from '../src/translation/pipeline.ts';
 import type { RecognitionEngine } from '../src/types.ts';
 
@@ -25,6 +28,7 @@ const speechOk = speechSupported();
 $<HTMLSelectElement>('engine').innerHTML =
   `<option value="offline-zipformer">Hors ligne — Zipformer Quran-Lab (indisponible : modèle non installé)</option>
    <option value="online-relay">En ligne — relais Basirah (clé fournisseur requise)</option>
+   <option value="offline-whisper">Hors ligne — Whisper dans le navigateur (modèle téléchargé une fois ; retard de quelques secondes)</option>
    <option value="quranlab-sdk">En ligne/local — TajweedFormer V4 (SDK Quran-Lab, clé requise, NON TESTÉ)</option>
    <option value="online-test"${speechOk ? '' : ' disabled'}>En ligne — TEST navigateur (Chrome/Edge, Google)${speechOk ? '' : ' — non supporté ici'}</option>`;
 $<HTMLSelectElement>('engine').value = speechOk ? 'online-test' : 'offline-zipformer';
@@ -35,10 +39,16 @@ const refreshEngineHelp = () => {
   $('engineHelp').textContent = ({
     'offline-zipformer': 'Le moteur hors ligne attend le modèle Quran-Lab (non présent). Démarrer affichera l\'erreur exacte.',
     'online-relay': 'Renseignez l\'adresse du relais et celle du jeton (serveur Basirah). Sans eux, Démarrer refuse.',
+    'offline-whisper': 'Whisper (transformers.js, modèle whisper-base) : tourne dans votre navigateur ; le modèle se télécharge à la première utilisation, puis fonctionne sans réseau. Whisper n\'est pas un modèle en flux : attendez quelques secondes de retard. Même moteur que l\'ancienne version.',
     'quranlab-sdk': 'SDK Quran-Lab : créez une clé web sur sdk.quranlab.ai (connexion Hugging Face) pour l\'adresse https de cette page, collez-la ci-dessous. Le SDK ouvre lui-même le micro. La sortie brute s\'affiche dans Diagnostic.',
     'online-test': 'Moteur de TEST du navigateur : l\'audio part chez Google ; précision sur le Coran inconnue ; il s\'arrête de lui-même (relancer à la main). Ce n\'est pas le moteur Basirah.' } as Record<string, string>)[engineKind];
 };
 $('engine').onchange = refreshEngineHelp; refreshEngineHelp();
+
+
+// Modèle Whisper embarqué ? (dossier models/Xenova/whisper-base/ publié avec l'application). Sinon : téléchargement externe à la 1re utilisation.
+let whisperLocal = false;
+(async () => { try { const r = await fetch('models/Xenova/whisper-base/config.json', { cache: 'no-store' }); if (r.ok) { await r.json(); whisperLocal = true; } } catch {} })();
 
 async function makeEngine(): Promise<RecognitionEngine> {
   if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
@@ -46,6 +56,10 @@ async function makeEngine(): Promise<RecognitionEngine> {
     const url = $<HTMLInputElement>('relayUrl').value.trim(), tok = $<HTMLInputElement>('tokenUrl').value.trim();
     if (!url || !tok) throw new Error('Mode en ligne (relais) : adresse du relais et adresse du jeton non renseignées. Aucun moteur en ligne n\'est configuré.');
     return new OnlineEngine(() => new WebSocketProvider(url, async () => (await (await fetch(tok)).json()).token, { language: 'ar' }), { maxRetries: 3 });
+  }
+  if (engineKind === 'offline-whisper') {
+    const known = new Set(q.words.map(w => w.sk));
+    return new WhisperEngine({ spawn: () => spawnWhisperWorker(WHISPER_WORKER_SRC), localBase: whisperLocal ? new URL('models/', location.href).href : undefined, knownSkeletons: known, holdback: $<HTMLSelectElement>('react').value === 'fast' ? 2 : undefined });
   }
   if (engineKind === 'quranlab-sdk') {
     const key = $<HTMLInputElement>('sdkKey').value.trim(); try { localStorage.setItem('qlkey', key); } catch {}
@@ -57,7 +71,7 @@ async function start() {
   err(null); if (running) return;
   try {
     const e = await makeEngine(); finals = []; lastText = ''; if (mode !== 'reading') session.reset();
-    session.attachEngine(e, 'text'); e.on('state', (s, w) => { diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
+    session.attachEngine(e, 'text'); e.on('state', (s, w) => { if (s === 'loading-model') $('engineHelp').textContent = w; diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
     e.on('result', r => { lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
     engine = e; tStart = performance.now(); lastKey = ''; tl.length = 0; await e.load(); running = true; setBtn();
     if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else await cap.start();
@@ -76,7 +90,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b => b.oncli
   render(session.view());
 });
 $('gotoBtn').onclick = () => { const s = +$<HTMLInputElement>('gs').value, a = +$<HTMLInputElement>('ga').value; if (!session.goto(s, a)) err(`${s}:${a} n'existe pas`); else err(null); };
-$<HTMLSelectElement>('react').onchange = () => session.setReactivity($<HTMLSelectElement>('react').value === 'fast');
+$<HTMLSelectElement>('react').onchange = () => { const f = $<HTMLSelectElement>('react').value === 'fast'; session.setReactivity(f); if (engine instanceof WhisperEngine) engine.setHoldback(f ? 2 : undefined); };
 $('hintBtn').onclick = () => { $('hint').textContent = session.hint(3).join(' ') || '—'; };
 
 // ── Rendu ─────────────────────────────────────────────────────────────────────
@@ -109,7 +123,7 @@ setInterval(() => {
   const s = cap.stats(); $('lvl').style.width = Math.min(100, s.rms * 600) + '%';
   const zero = s.status === 'running' && s.maxPeak === 0 && s.silentMs > 4000;
   $('stats').textContent = (zero ? '⚠ SILENCE NUMÉRIQUE EXACT depuis ' + (s.silentMs / 1000).toFixed(0) + ' s : le micro choisi n\'envoie aucun signal (muet, mauvais périphérique, ou bloqué par Windows/Chrome). Choisissez un autre micro ci-dessus.\n' : '') + `piste : ${s.track ? `${s.track.label} · muet=${s.track.muted} · actif=${s.track.enabled} · ${s.track.readyState} · ${s.track.settings}` : '—'}\ncrête maximale depuis le début : ${s.maxPeak.toFixed(4)}\nmicro ${s.status} · niveau ${s.rms.toFixed(4)} · crête ${s.peak.toFixed(3)} · silence ${(s.silentMs / 1000).toFixed(1)} s · fréquence ${s.sampleRate ?? '—'} Hz · autorisations ${s.permissionRequests} · flux ${s.streams} · abandonné ${s.dropped}`;
-  const v = session.view(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', 'CHRONOLOGIE (temps depuis le démarrage)', ...tl.slice(-80), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
+  const v = session.view(); const es = (() => { try { return JSON.stringify(engine?.stats?.()); } catch { return ''; } })(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Statistiques du moteur : ' + es, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', 'CHRONOLOGIE (temps depuis le démarrage)', ...tl.slice(-80), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
 }, 500);
 $('copy').onclick = () => navigator.clipboard.writeText($('stats').textContent + '\n' + $('dlog').textContent).then(() => diagLog('rapport copié'));
 
@@ -119,6 +133,7 @@ const FEATS: [boolean, string, string][] = [
   [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
   [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
   [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
+  [false, 'Hors ligne : Whisper dans le navigateur', 'IMPLÉMENTÉ, NON EXÉCUTÉ ICI : reprend le moteur de l\'ancienne version (qui fonctionnait chez vous) ; retard de quelques secondes ; modèle téléchargé par votre navigateur à la première utilisation'],
   [false, 'Hors ligne : Zipformer Quran-Lab', 'EN ATTENTE : modèle + runtime sherpa-onnx WebAssembly (voir MODEL-SETUP-QURANLAB.md)'],
   [false, 'En ligne : relais Basirah', 'EN ATTENTE : serveur relais + clé fournisseur (voir ONLINE-PROVIDERS.md)'],
   [false, 'Traduction arabe → français', 'EN ATTENTE : aucun traducteur branché ; rien n\'est inventé'],

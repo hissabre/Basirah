@@ -9,3 +9,10 @@
 7. **En ligne** : choix du fournisseur, clé côté serveur, test de l'adaptateur `deepgram` (non testé, prise en charge de l'arabe/Coran non vérifiée).
 8. **Natif** : décider Capacitor ou applications natives ; matériel des lunettes.
 9. Éléments `unverified` de `licensing/inventory.json`.
+
+## Modèle Whisper embarqué (aucun téléchargement externe)
+Le code est prêt : si le dossier `public/models/Xenova/whisper-base/` existe sur le site, l'application l'utilise et n'appelle PLUS Hugging Face (le moteur transformers.js est encore chargé depuis un CDN — à embarquer aussi, voir plus bas).
+1. Sur la page https://huggingface.co/Xenova/whisper-base/tree/main : télécharger (avec votre accord) `config.json`, `generation_config.json`, `preprocessor_config.json`, `tokenizer.json`, `tokenizer_config.json` + dans `onnx/` : `encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx` (mode processeur) et, pour le mode carte graphique, `encoder_model.onnx`, `decoder_model_merged_q4.onnx`.
+   Noms déduits des conventions de transformers.js, NON vérifiés : si un fichier manque, l'erreur affichée par la page donne l'adresse exacte à ajouter.
+2. Les placer dans `public/models/Xenova/whisper-base/` (sous-dossier `onnx/` inclus) du dépôt. Limite d'envoi GitHub par navigateur : 25 Mo par fichier — pour un fichier plus gros, me le dire : je prépare un découpage.
+3. NON TESTÉ : le chargement local n'a pas pu être exécuté ici (Hugging Face inaccessible depuis mon environnement).

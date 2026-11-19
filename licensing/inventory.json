@@ -146,7 +146,7 @@
       "needs": [
         "commercial"
       ],
-      "notes": "NPL-1.2 (résumé lu le 2026-11-17, texte intégral à relire sur sdk.quranlab.ai/licence) : interdit de faire payer le modèle, l'accès ou une fonctionnalité qu'il alimente (ventes, abonnements, essais payants, publicité sur la fonctionnalité) ; « aucune licence pour facturer ne sera accordée ». Usage gratuit autorisé. Affichage obligatoire : le retour de tajweed automatique peut être faux et ne remplace pas un enseignant qualifié."
+      "notes": "NPL-1.2 (résumé lu le 2026-11-17, texte intégral à relire sur sdk.quranlab.ai/licence) : interdit de faire payer le modèle, l'accès ou une fonctionnalité qu'il alimente (ventes, abonnements, essais payants, publicité sur la fonctionnalité) ; « aucune licence pour facturer ne sera accordée ». Usage gratuit autorisé. Avertissement sur le tajweed : encouragé, non obligatoire. Matériel vendu avec le modèle : non couvert, interdit par la lecture littérale de §3/§9."
     },
     {
       "id": "quranlab-zipformer-quran-3",
