@@ -1,0 +1,15 @@
+# Un clic : GitHub → onglet Actions → « inspect-quran-asr-tiny » → Run workflow. Téléchargez ensuite « quran-asr-tiny-spec » (Artifacts) et envoyez-le à Claude.
+name: inspect-quran-asr-tiny
+on: { workflow_dispatch: {} }
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install huggingface_hub onnxruntime onnx numpy soundfile kaldi-native-fbank sherpa-onnx datasets
+      - run: python tools/inspect_quran_asr_tiny.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: quran-asr-tiny-spec, path: out }
