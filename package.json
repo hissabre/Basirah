@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Cœur partagé de Basirah : alignement du Coran, machine d'états, audio. Indépendant du moteur de reconnaissance.",
   "scripts": {
-    "test": "node --experimental-transform-types --no-warnings test/run.ts && node --experimental-transform-types --no-warnings test/run-phoneme.ts && node --experimental-transform-types --no-warnings test/run-engine.ts && node --experimental-transform-types --no-warnings test/run-eval.ts && node --experimental-transform-types --no-warnings test/run-core.ts && node --experimental-transform-types --no-warnings test/run-app.ts && node --experimental-transform-types --no-warnings test/run-whisper.ts && node --experimental-transform-types --no-warnings test/run-ctc.ts",
+    "test": "node --experimental-transform-types --no-warnings test/run.ts && node --experimental-transform-types --no-warnings test/run-phoneme.ts && node --experimental-transform-types --no-warnings test/run-engine.ts && node --experimental-transform-types --no-warnings test/run-eval.ts && node --experimental-transform-types --no-warnings test/run-core.ts && node --experimental-transform-types --no-warnings test/run-app.ts && node --experimental-transform-types --no-warnings test/run-whisper.ts && node --experimental-transform-types --no-warnings test/run-ctc.ts && node --experimental-transform-types --no-warnings test/run-bench.ts && node --experimental-transform-types --no-warnings test/run-fbank.ts",
     "typecheck": "tsc --noEmit",
     "eval": "node --experimental-transform-types --no-warnings src/eval/cli.ts",
     "licence:check": "node --experimental-transform-types --no-warnings tools/licence-check.ts",

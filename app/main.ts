@@ -10,6 +10,7 @@ import { WHISPER_WORKER_SRC } from '../src/engine/whisper-worker-src.ts';
 import { skeleton } from '../src/quran/normalize.ts';
 import { TranslationPipeline, UnavailableTranslator } from '../src/translation/pipeline.ts';
 import type { RecognitionEngine } from '../src/types.ts';
+import { runBench, benchReport } from '../src/app/bench.ts';
 
 declare const QURAN: RawQuran;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -25,13 +26,14 @@ const err = (m: string | null) => { const e = $('err'); e.hidden = !m; e.textCon
 
 // ── Moteurs ───────────────────────────────────────────────────────────────────
 const speechOk = speechSupported();
+const adv = new URLSearchParams(location.search).has('avance'); // ?avance=1 : moteurs en attente de configuration (clé, modèle)
 $<HTMLSelectElement>('engine').innerHTML =
-  `<option value="offline-zipformer">Hors ligne — Zipformer Quran-Lab (indisponible : modèle non installé)</option>
-   <option value="online-relay">En ligne — relais Basirah (clé fournisseur requise)</option>
-   <option value="offline-whisper">Hors ligne — Whisper dans le navigateur (modèle téléchargé une fois ; retard de quelques secondes)</option>
-   <option value="quranlab-sdk">En ligne/local — TajweedFormer V4 (SDK Quran-Lab, clé requise, NON TESTÉ)</option>
-   <option value="online-test"${speechOk ? '' : ' disabled'}>En ligne — TEST navigateur (Chrome/Edge, Google)${speechOk ? '' : ' — non supporté ici'}</option>`;
-$<HTMLSelectElement>('engine').value = speechOk ? 'online-test' : 'offline-zipformer';
+  `<option value="offline-whisper">Hors ligne — Whisper dans le navigateur (modèle téléchargé une fois ; retard de quelques secondes)</option>
+   <option value="online-test"${speechOk ? '' : ' disabled'}>En ligne — TEST navigateur (Chrome/Edge, Google)${speechOk ? '' : ' — non supporté ici'}</option>` +
+  (adv ? `<option value="offline-zipformer">[avancé] Hors ligne — Zipformer Quran-Lab (modèle non installé)</option>
+   <option value="online-relay">[avancé] En ligne — relais Basirah (clé fournisseur requise)</option>
+   <option value="quranlab-sdk">[avancé] TajweedFormer V4 (SDK Quran-Lab, clé requise, NON TESTÉ)</option>` : '');
+$<HTMLSelectElement>('engine').value = 'offline-whisper';
 engineKind = $<HTMLSelectElement>('engine').value;
 const refreshEngineHelp = () => {
   engineKind = $<HTMLSelectElement>('engine').value;
@@ -50,7 +52,8 @@ $('engine').onchange = refreshEngineHelp; refreshEngineHelp();
 let whisperLocal = false;
 (async () => { try { const r = await fetch('models/Xenova/whisper-base/config.json', { cache: 'no-store' }); if (r.ok) { await r.json(); whisperLocal = true; } } catch {} })();
 
-async function makeEngine(): Promise<RecognitionEngine> {
+async function makeEngine(engineKind_: string = engineKind): Promise<RecognitionEngine> {
+  const engineKind = engineKind_;
   if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
   if (engineKind === 'online-relay') {
     const url = $<HTMLInputElement>('relayUrl').value.trim(), tok = $<HTMLInputElement>('tokenUrl').value.trim();
@@ -125,13 +128,42 @@ setInterval(() => {
   $('stats').textContent = (zero ? '⚠ SILENCE NUMÉRIQUE EXACT depuis ' + (s.silentMs / 1000).toFixed(0) + ' s : le micro choisi n\'envoie aucun signal (muet, mauvais périphérique, ou bloqué par Windows/Chrome). Choisissez un autre micro ci-dessus.\n' : '') + `piste : ${s.track ? `${s.track.label} · muet=${s.track.muted} · actif=${s.track.enabled} · ${s.track.readyState} · ${s.track.settings}` : '—'}\ncrête maximale depuis le début : ${s.maxPeak.toFixed(4)}\nmicro ${s.status} · niveau ${s.rms.toFixed(4)} · crête ${s.peak.toFixed(3)} · silence ${(s.silentMs / 1000).toFixed(1)} s · fréquence ${s.sampleRate ?? '—'} Hz · autorisations ${s.permissionRequests} · flux ${s.streams} · abandonné ${s.dropped}`;
   const v = session.view(); const es = (() => { try { return JSON.stringify(engine?.stats?.()); } catch { return ''; } })(); $('dlog').textContent = ['Moteur : ' + (v.engine ? `${v.engine.id} (${v.engine.state})` : 'aucun'), 'Navigateur : ' + navigator.userAgent, 'Statistiques du moteur : ' + es, 'Reconnaissance vocale navigateur : ' + (speechOk ? 'oui' : 'non'), '', ...dl.slice(-40), '', 'CHRONOLOGIE (temps depuis le démarrage)', ...tl.slice(-80), '', ...session.log.slice(-15).map(l => l.msg)].join('\n');
 }, 500);
-$('copy').onclick = () => navigator.clipboard.writeText($('stats').textContent + '\n' + $('dlog').textContent).then(() => diagLog('rapport copié'));
+$('copy').onclick = () => navigator.clipboard.writeText($('benchOut').textContent + '\n\n' + $('stats').textContent + '\n' + $('dlog').textContent).then(() => diagLog('rapport copié'));
+
+
+// ── Banc d'essai : vrais fichiers audio → Whisper → même session que le micro ──────────────────────────────────
+const decodeTo16k = async (f: File): Promise<Float32Array> => {
+  const ac = new AudioContext(); let buf: AudioBuffer;
+  try { buf = await ac.decodeAudioData(await f.arrayBuffer()); } finally { void ac.close(); }
+  const oc = new OfflineAudioContext(1, Math.max(1, Math.ceil(buf.duration * 16000)), 16000), src = oc.createBufferSource();
+  src.buffer = buf; src.connect(oc.destination); src.start(); return (await oc.startRendering()).getChannelData(0).slice();
+};
+let benching = false;
+$('benchGo').onclick = async () => {
+  if (benching || running) { err(running ? 'Arrêtez d\'abord l\'écoute avant le banc d\'essai.' : null); return; }
+  const files = Array.from($<HTMLInputElement>('benchFiles').files ?? []); const out = $('benchOut'); err(null);
+  if (!files.length) { out.textContent = 'Choisissez des fichiers audio (mp3/wav…). Nom attendu : 067001.mp3 = sourate 67, verset 1.'; return; }
+  benching = true; $('benchGo').setAttribute('disabled', ''); let e: RecognitionEngine | null = null;
+  try {
+    const pace = +$<HTMLSelectElement>('benchPace').value;
+    const pcms: { name: string; pcm: Float32Array }[] = [];
+    for (const f of files.sort((a, b) => a.name.localeCompare(b.name))) { out.textContent = 'Lecture de ' + f.name + '…'; pcms.push({ name: f.name, pcm: await decodeTo16k(f) }); }
+    diagLog(`banc : ${pcms.length} fichier(s) décodé(s), ${(pcms.reduce((x, p) => x + p.pcm.length, 0) / 16000).toFixed(1)} s d'audio à 16 kHz`);
+    out.textContent = 'Chargement du moteur Whisper…';
+    e = await makeEngine('offline-whisper'); session.attachEngine(e, 'text'); e.on('state', (st, w) => { if (st === 'loading-model') out.textContent = w; diagLog(`banc : ${st} — ${w}`); if (st === 'error') err('Moteur : ' + w); }); await e.load();
+    const rows = await runBench(pcms, { engine: e, session, quran: q, pace, now: () => performance.now(), sleep: ms => new Promise(r => setTimeout(r, ms)), onProgress: m => { out.textContent = 'En cours : ' + m; } });
+    out.textContent = benchReport(rows, { engine: e.id + (e instanceof WhisperEngine ? ` (${e.dev === 'webgpu' ? 'GPU' : 'processeur'})` : ''), pace }) + '\nStatistiques du moteur : ' + JSON.stringify(e.stats());
+  } catch (x) { out.textContent = 'Échec du banc d\'essai : ' + (x as Error).message; err((x as Error).message); }
+  finally { try { await e?.dispose(); } catch {} benching = false; $('benchGo').removeAttribute('disabled'); }
+};
 
 const FEATS: [boolean, string, string][] = [
   [true, 'Texte du Coran, 6236 versets (Tanzil, licence à vérifier)', 'chargé dans la page'],
   [true, 'Suivi de position (alignement mots) et modes Prière / Hifz / Lecture', 'code testé en simulation ; pas encore sur voix réelle'],
   [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
   [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
+  [true, 'Banc d\'essai : fichiers audio réels → Whisper → suivi (dans Diagnostic)', 'logique testée avec un moteur FACTICE ; premier vrai passage = chez vous'],
+  [false, 'Décodeur contraint par le texte (millisecondes)', 'écrit et testé en SIMULATION seulement ; pas branché : il attend un modèle en flux (TajweedFormer/le nôtre)'],
   [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
   [false, 'Hors ligne : Whisper dans le navigateur', 'IMPLÉMENTÉ, NON EXÉCUTÉ ICI : reprend le moteur de l\'ancienne version (qui fonctionnait chez vous) ; retard de quelques secondes ; modèle téléchargé par votre navigateur à la première utilisation'],
   [false, 'Hors ligne : Zipformer Quran-Lab', 'EN ATTENTE : modèle + runtime sherpa-onnx WebAssembly (voir MODEL-SETUP-QURANLAB.md)'],
