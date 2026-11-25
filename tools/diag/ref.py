@@ -14,3 +14,24 @@ for f in files:
     lp = sess.run(None, {sess.get_inputs()[0].name: F[None], sess.get_inputs()[1].name: np.array([len(F)], dtype=np.int64)})[0][0]
     g = lp.argmax(-1); txt = ''.join(toks[int(v)] for i, v in enumerate(g) if v != 0 and (i == 0 or v != g[i-1])).replace('▁', ' ')
     print(f'\n{f}\n  sherpa : {s.result.text}\n  knf+ort: {txt}\n  frames {len(F)} -> {lp.shape}  mean max p {np.exp(lp.max(-1)).mean():.3f}')
+
+# ── Fbank de la PAGE : fichier entier puis fenêtres glissantes comme le moteur ──
+def greedy(lp, prev=-1):
+    t = ''
+    for v in lp.argmax(-1):
+        if v != 0 and v != prev: t += toks[int(v)]
+        prev = v
+    return t.replace('▁', ' '), prev
+for f in files:
+    P = np.fromfile(f + '.page', dtype=np.float32).reshape(-1, 80); K = np.fromfile(f + '.knf', dtype=np.float32).reshape(-1, 80)
+    n = min(len(P), len(K)); d = np.abs(P[:n] - K[:n])
+    print(f'\n{f}\n  fbank page vs knf : écart max {d.max():.3f} moyen {d.mean():.4f} ({len(P)} vs {len(K)} images); par bande max: {np.round(d.max(0)[[0,1,2,40,78,79]],3)}')
+    run = lambda X: sess.run(None, {sess.get_inputs()[0].name: X[None], sess.get_inputs()[1].name: np.array([len(X)], dtype=np.int64)})[0][0]
+    print('  page, fichier entier :', greedy(run(P))[0])
+    for W, G in [(240, 12), (400, 12), (240, 40)]:
+        out, last, prev = '', -1.0, -1
+        for end in range(50, len(P) + 1, 24):
+            st = max(0, end - W); lp = run(P[st:end]); dt = (end - st) / len(lp)
+            ks = [k for k in range(len(lp)) if st + (k + .5) * dt > last and st + (k + .5) * dt <= end - G]
+            if ks: t, prev = greedy(lp[ks[0]:ks[-1] + 1], prev); out += t; last = st + (ks[-1] + .5) * dt
+        print(f'  page, fenêtres {W/100:.1f} s marge {G/100:.2f} s :', out)

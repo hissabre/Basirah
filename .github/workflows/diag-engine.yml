@@ -7,10 +7,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm install && npm install --no-save onnxruntime-node@1.22.0
+      - run: npm install
       - run: pip install sherpa-onnx kaldi-native-fbank onnxruntime numpy
       - run: |
           mkdir -p m a; for f in model.int8.onnx tokens.txt; do curl -fsSL -o m/$f https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/$f; done
           for v in 067001 112001 036001; do curl -fsSL -o a/$v.mp3 https://everyayah.com/data/Alafasy_128kbps/$v.mp3; ffmpeg -loglevel error -i a/$v.mp3 -ac 1 -ar 16000 -f f32le a/$v.f32; done
+      - run: node --experimental-transform-types --no-warnings tools/diag/page.ts a/067001.f32 a/112001.f32 a/036001.f32
       - run: python tools/diag/ref.py m/model.int8.onnx m/tokens.txt a/067001.f32 a/112001.f32 a/036001.f32
-      - run: node --experimental-transform-types --no-warnings tools/diag/page.ts m/model.int8.onnx m/tokens.txt a/067001.f32 a/112001.f32 a/036001.f32
