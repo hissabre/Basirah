@@ -1,0 +1,14 @@
+# Copie le modèle et ONNX Runtime dans la branche « assets » (pour construire des pages de test hors GitHub Pages).
+name: assets-branch
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir -p w/models/quran-asr-tiny w/vendor/ort && cd w
+          for f in model.int8.onnx tokens.txt; do curl -fsSL -o models/quran-asr-tiny/$f https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/$f; done
+          for f in ort.wasm.min.js ort-wasm-simd-threaded.wasm ort-wasm-simd-threaded.mjs; do curl -fsSL -o vendor/ort/$f https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/$f; done
+          git init -q -b assets && git add -A && git -c user.name=ci -c user.email=ci@x commit -qm assets
+          git push -f https://x-access-token:${{ github.token }}@github.com/${{ github.repository }} assets
