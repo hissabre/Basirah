@@ -8,6 +8,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install
+      - run: sudo apt-get install -y -qq ffmpeg >/dev/null
       - run: pip install sherpa-onnx kaldi-native-fbank onnxruntime numpy
       - run: |
           mkdir -p m a; for f in model.int8.onnx tokens.txt; do curl -fsSL -o m/$f https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/$f; done
