@@ -44,5 +44,6 @@ self.onmessage=async e=>{const d=e.data;try{
   const t=performance.now();let x=d.x;
   if(cal===null&&d.voiced){const x2=new Float32Array(x.length);for(let i=0;i<x.length;i++)x2[i]=x[i]+20.7944;const a=await run(x,d.T),b=await run(x2,d.T),sa=score(a),sb=score(b);cal={scale:sb>sa*1.5&&sb>3?32768:1,s1:+sa.toFixed(2),s32768:+sb.toFixed(2)};offs=cal.scale===1?0:20.7944;post({cal})}
   if(offs){const y=new Float32Array(x.length);for(let i=0;i<x.length;i++)y[i]=x[i]+offs;x=y}
-  const o=await run(x,d.T);post({lp:o.a,n:o.n,V:o.V,t0:d.t0,t1:d.t1,id:d.id,ms:performance.now()-t},[o.a.buffer]);return}
+  let T=d.T;if(d.pad){const y=new Float32Array((T+d.pad)*B);y.set(x);y.fill(-15.9424,T*B);x=y;T+=d.pad}
+  const o=await run(x,T);post({lp:o.a,n:o.n,V:o.V,t0:d.t0,t1:d.t1,pad:d.pad||0,id:d.id,ms:performance.now()-t},[o.a.buffer]);return}
 }catch(err){post({err:String(err&&err.message||err),id:d&&d.id})}};`;

@@ -42,7 +42,7 @@ function fakeWorker(get: () => Spoken[], err: { sub: number; del: number; weak: 
   w.postMessage = (d: any) => queueMicrotask(() => {
     if (d.init) { w.onmessage({ data: { ready: 1, tokens: TOK, url: 'FAUX', tokUrl: 'FAUX', threads: 1, warmMs: 0 } }); return; }
     if (!d.run) return;
-    const n = Math.floor((d.T - 7) / 4), V = 31, lp = new Float32Array(n * V), dt = (d.t1 - d.t0) / n, sp = get();
+    const pad = d.pad ?? 0, n = Math.floor((d.T + pad - 7) / 4), V = 31, lp = new Float32Array(n * V), dt = (d.t1 - d.t0 + pad * 0.01) / n, sp = get();
     for (let k = 0; k < n; k++) {
       const tk = d.t0 + (k + 0.5) * dt, hit = sp.find(s => s.at >= tk - dt / 2 && s.at < tk + dt / 2);
       const p = new Float32Array(V).fill(0.1 / (V - 1));
@@ -50,7 +50,7 @@ function fakeWorker(get: () => Spoken[], err: { sub: number; del: number; weak: 
       else { p.fill(0.08 / (V - 1)); p[0] = 0.92; }
       for (let i = 0; i < V; i++) lp[k * V + i] = Math.log(p[i]);
     }
-    w.onmessage({ data: { lp, n, V, t0: d.t0, t1: d.t1, ms: 60 } });
+    w.onmessage({ data: { lp, n, V, t0: d.t0, t1: d.t1, pad, ms: 60 } });
   });
   return w;
 }

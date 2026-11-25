@@ -14,6 +14,8 @@ export interface QuranCtcOptions {
   minHopSec?: number;
   /** Les images les plus récentes (sans contexte à droite) ne sont transmises qu'à la passe suivante (s). */
   guardSec?: number;
+  /** Silence ajouté après l'audio à chaque passe (s) : le modèle, non conçu pour le flux, reconnaît bien mieux la fin de la fenêtre. */
+  padSec?: number;
   id?: string;
 }
 
@@ -35,7 +37,7 @@ export function parseTokens(txt: string): CtcVocab {
 
 /**
  * Moteur hors ligne « Coran » : modèle acoustique CTC de lettres (quran-asr-tiny, 16 M paramètres) dans un worker,
- * fenêtre glissante courte (2,4 s) relancée toutes les ~0,25 s, fbank calculées une seule fois en flux.
+ * fenêtre glissante (8 s, + 0,8 s de silence ajouté) relancée toutes les ~0,25 s, fbank calculées une seule fois en flux.
  * Il NE fabrique PAS de texte : il transmet à la session les probabilités de lettres de chaque image (≈ 40 ms),
  * que le suivi contraint par le texte du Coran (CtcTracker) transforme en position. Retard visé : ≈ 0,3–0,5 s.
  */
@@ -74,7 +76,7 @@ export class QuranCtcEngine implements RecognitionEngine {
   }
   private maybeRun() {
     if (!this.ready || this.busy || !this.w) return;
-    const F = this.fb.framesDone, W = Math.min(F, Math.round((this.o.windowSec ?? 2.4) * 100));
+    const F = this.fb.framesDone, W = Math.min(F, Math.round((this.o.windowSec ?? 8) * 100));
     if (!this.finalRun && (F - this.lastRunFrame < this.hop * 100 || W < 50)) return;
     const base = this.base ?? 0;
     if (!this.finalRun && this.peak < 0.004) { // silence : rien à reconnaître, on économise la batterie
@@ -82,7 +84,7 @@ export class QuranCtcEngine implements RecognitionEngine {
     }
     const x = this.fb.slice(F - W, F), voiced = this.peak > 0.02; this.peak = 0;
     this.busy = true; this.lastRunFrame = F; this.runs++;
-    this.w.postMessage({ run: 1, x, T: W, t0: base + (F - W) * 0.01, t1: base + F * 0.01, id: ++this.runId, voiced }, [x.buffer]);
+    this.w.postMessage({ run: 1, x, T: W, t0: base + (F - W) * 0.01, t1: base + F * 0.01, pad: Math.round((this.o.padSec ?? 0.8) * 100), id: ++this.runId, voiced }, [x.buffer]);
   }
   private onWorker(d: any) {
     if (d.cal) { this.info.echelle = d.cal; return; }
@@ -91,7 +93,7 @@ export class QuranCtcEngine implements RecognitionEngine {
     if (!d.lp) return;
     this.lastMs = d.ms; this.lat.push(d.ms); if (this.lat.length > 50) this.lat.shift();
     this.hop = Math.max(this.o.minHopSec ?? 0.24, Math.min(1.2, d.ms / 1000 * 1.15));
-    const n: number = d.n, V: number = d.V, lp: Float32Array = d.lp, dt = (d.t1 - d.t0) / Math.max(1, n);
+    const n: number = d.n, V: number = d.V, lp: Float32Array = d.lp, dt = (d.t1 - d.t0 + (d.pad ?? 0) * 0.01) / Math.max(1, n);
     const guard = this.finalRun ? 0 : (this.o.guardSec ?? 0.12), frames: Float32Array[] = [], times: number[] = [];
     let text = '', prev = -1; const v = this.vocab!;
     for (let k = 0; k < n; k++) {
