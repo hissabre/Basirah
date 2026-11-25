@@ -35,3 +35,27 @@ for f in files:
             ks = [k for k in range(len(lp)) if st + (k + .5) * dt > last and st + (k + .5) * dt <= end - G]
             if ks: t, prev = greedy(lp[ks[0]:ks[-1] + 1], prev); out += t; last = st + (ks[-1] + .5) * dt
         print(f'  page, fenêtres {W/100:.1f} s marge {G/100:.2f} s :', out)
+
+# ── Variantes de découpage : contexte long + silence ajouté à droite ──
+import time
+def ed(a, b):
+    p = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        c = [i] + [0] * len(b)
+        for j, y in enumerate(b, 1): c[j] = min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (x != y))
+        p = c
+    return p[-1]
+for f in files:
+    P = np.fromfile(f + '.page', dtype=np.float32).reshape(-1, 80); ref = greedy(run(P))[0].replace(' ', '')
+    print(f'\n{f}  référence: {ref}')
+    for W, pad, G in [(1200, 0, 40), (1200, 0, 24), (1200, 30, 12), (1200, 50, 0), (600, 50, 12), (1200, 80, 12), (2000, 50, 12)]:
+        out, last, prev, tm, nr = '', -1.0, -1, 0.0, 0
+        sil = np.full((pad, 80), np.log(1.1920929e-7), np.float32) + 0  # niveau plancher
+        for end in range(50, len(P) + 1, 24):
+            st = max(0, end - W); X = np.concatenate([P[st:end], sil]) if pad else P[st:end]
+            t0 = time.time(); lp = run(X); tm += time.time() - t0; nr += 1
+            dt = len(X) / len(lp)
+            ks = [k for k in range(len(lp)) if st + (k + .5) * dt > last and st + (k + .5) * dt <= end - G]
+            if ks: t, prev = greedy(lp[ks[0]:ks[-1] + 1], prev); out += t; last = st + (ks[-1] + .5) * dt
+        o = out.replace(' ', '')
+        print(f'  W {W/100:4.1f}s pad {pad/100:.2f}s marge {G/100:.2f}s  erreurs {ed(o, ref):3d}/{len(ref)}  passe {1000*tm/nr:5.1f} ms  : {out}')
