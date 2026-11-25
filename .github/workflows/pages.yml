@@ -13,6 +13,21 @@ jobs:
       - run: npm install
       - run: npm test
       - run: npm run build:app
+      # Modèle Coran publié AVEC l'application (aucun téléchargement externe à l'exécution). Licence MIT (Abdou/quran-asr-tiny).
+      # Si Hugging Face est injoignable, l'application se rabat sur Hugging Face au moment de l'utilisation.
+      - name: Embarquer le modèle quran-asr-tiny
+        continue-on-error: true
+        run: |
+          mkdir -p public/models/quran-asr-tiny
+          for f in model.int8.onnx tokens.txt; do curl -fsSL --retry 3 -o public/models/quran-asr-tiny/$f https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/$f; done
+          ls -la public/models/quran-asr-tiny; head -40 public/models/quran-asr-tiny/tokens.txt
+      # ONNX Runtime Web publié avec l'application (même origine : fonctionne hors ligne, même si le CDN est bloqué).
+      - name: Embarquer ONNX Runtime Web 1.27.0
+        continue-on-error: true
+        run: |
+          mkdir -p public/vendor/ort
+          for f in ort.wasm.min.js ort-wasm-simd-threaded.wasm ort-wasm-simd-threaded.mjs; do curl -fsSL --retry 3 -o public/vendor/ort/$f https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/$f; done
+          ls -la public/vendor/ort
       - uses: actions/upload-pages-artifact@v3
         with: { path: public }
   deploy:

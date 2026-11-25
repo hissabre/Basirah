@@ -14,7 +14,7 @@ export class Stabilizer {
   constructor(private readonly agree = 2, private readonly fast = false) {}
 
   /** Retourne les NOUVEAUX mots confirmés par ce résultat. */
-  push(r: Pick<RecognitionResult, 'text' | 'isFinal' | 'audioStart'> & { tokens?: string[]; unit?: 'text' | 'phoneme' }): string[] {
+  push(r: Pick<RecognitionResult, 'text' | 'isFinal' | 'audioStart'> & { tokens?: string[]; unit?: 'text' | 'phoneme' | 'ctc' }): string[] {
     const key = String(r.audioStart);
     if (key !== this.segKey) { this.segKey = key; this.prev = []; this.committed = 0; }
     const cur = r.unit === 'phoneme' && r.tokens ? r.tokens : norm(r.text).split(' ').filter(Boolean);

@@ -32,7 +32,7 @@ input[type=number]{width:80px}
 <section id="diag" class="card" hidden><div class="row"><button id="micTest">Tester le micro seul</button><button id="micStop">Arrêter le micro</button><button id="copy">Copier le rapport</button></div>
 <div class="row"><select id="micSel" aria-label="Micro"><option>(cliquer Lister, ou Tester le micro)</option></select><button id="micList">Lister les micros</button></div>
 <p class="mut"><small>Le moteur TEST du navigateur utilise le micro par défaut de Chrome (non modifiable ici). Le test micro seul utilise celui choisi dans cette liste.</small></p>
-<div class="meter"><div id="lvl"></div></div><pre id="stats"></pre><b>Banc d'essai</b> <small class="mut">vrais fichiers audio → Whisper hors ligne → même suivi que le micro. Nom du fichier = verset (067001.mp3 = sourate 67, verset 1).</small>
+<div class="meter"><div id="lvl"></div></div><pre id="stats"></pre><b>Banc d'essai</b> <small class="mut">vrais fichiers audio → moteur choisi en haut (Basirah Coran par défaut, ou Whisper) → même suivi que le micro. Nom du fichier = verset (067001.mp3 = sourate 67, verset 1).</small>
 <div class="row"><input id="benchFiles" type="file" accept="audio/*" multiple><select id="benchPace" aria-label="Vitesse"><option value="1">Temps réel (mesure la latence)</option><option value="4">4× plus vite (précision seulement)</option></select><button id="benchGo">Lancer</button></div><pre id="benchOut">—</pre>
 <div hidden><b>Sortie brute du SDK Quran-Lab (dernier chunk)</b><pre id="raw">—</pre></div><pre id="dlog"></pre></section>
 <p class="mut"><small><b>Le retour automatique de tajweed peut être faux et ne remplace pas un enseignant qualifié.</b></small></p>

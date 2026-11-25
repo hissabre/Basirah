@@ -1,3 +1,13 @@
+# À FAIRE (Hamadoun) — novembre 2026, moteur Basirah Coran
+
+1. Remplacez les fichiers du dépôt par ceux du zip, puis envoyez (le site se reconstruit seul, avec le modèle).
+2. Ouvrez https://hissabre.github.io/Basirah/ (Chrome ou Edge), moteur « Hors ligne — Basirah Coran » (déjà choisi), Démarrer, récitez.
+3. Envoyez-moi : Diagnostic → « Copier le rapport ».  Mieux encore : Diagnostic → Banc d'essai avec quelques fichiers EveryAyah (ex. 067001.mp3).
+
+(Le workflow inspect-quran-asr-tiny n'est plus nécessaire.)
+
+---
+
 # À faire par Hamadoun — le strict minimum
 
 ## NOUVEAU (23/11) — débloque le modèle Quran léger

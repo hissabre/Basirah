@@ -7,6 +7,8 @@ import { WebSpeechEngine, speechSupported } from '../src/engine/webspeech.ts';
 import { TajweedFormerEngine } from '../src/engine/tajweedformer.ts';
 import { WhisperEngine, spawnWhisperWorker } from '../src/engine/whisper.ts';
 import { WHISPER_WORKER_SRC } from '../src/engine/whisper-worker-src.ts';
+import { QuranCtcEngine, spawnClassicWorker } from '../src/engine/quran-ctc.ts';
+import { QURAN_CTC_WORKER_SRC } from '../src/engine/quran-ctc-worker-src.ts';
 import { skeleton } from '../src/quran/normalize.ts';
 import { TranslationPipeline, UnavailableTranslator } from '../src/translation/pipeline.ts';
 import type { RecognitionEngine } from '../src/types.ts';
@@ -28,12 +30,13 @@ const err = (m: string | null) => { const e = $('err'); e.hidden = !m; e.textCon
 const speechOk = speechSupported();
 const adv = new URLSearchParams(location.search).has('avance'); // ?avance=1 : moteurs en attente de configuration (clé, modèle)
 $<HTMLSelectElement>('engine').innerHTML =
-  `<option value="offline-whisper">Hors ligne — Whisper dans le navigateur (modèle téléchargé une fois ; retard de quelques secondes)</option>
+  `<option value="offline-quran">Hors ligne — Basirah Coran (rapide, recommandé)</option>
+   <option value="offline-whisper">Hors ligne — Whisper dans le navigateur (modèle téléchargé une fois ; retard de quelques secondes)</option>
    <option value="online-test"${speechOk ? '' : ' disabled'}>En ligne — TEST navigateur (Chrome/Edge, Google)${speechOk ? '' : ' — non supporté ici'}</option>` +
   (adv ? `<option value="offline-zipformer">[avancé] Hors ligne — Zipformer Quran-Lab (modèle non installé)</option>
    <option value="online-relay">[avancé] En ligne — relais Basirah (clé fournisseur requise)</option>
    <option value="quranlab-sdk">[avancé] TajweedFormer V4 (SDK Quran-Lab, clé requise, NON TESTÉ)</option>` : '');
-$<HTMLSelectElement>('engine').value = 'offline-whisper';
+$<HTMLSelectElement>('engine').value = 'offline-quran';
 engineKind = $<HTMLSelectElement>('engine').value;
 const refreshEngineHelp = () => {
   engineKind = $<HTMLSelectElement>('engine').value;
@@ -41,6 +44,7 @@ const refreshEngineHelp = () => {
   $('engineHelp').textContent = ({
     'offline-zipformer': 'Le moteur hors ligne attend le modèle Quran-Lab (non présent). Démarrer affichera l\'erreur exacte.',
     'online-relay': 'Renseignez l\'adresse du relais et celle du jeton (serveur Basirah). Sans eux, Démarrer refuse.',
+    'offline-quran': 'Moteur Basirah : un petit modèle entraîné sur la récitation du Coran (quran-asr-tiny, 19 Mo, licence MIT) entend les lettres, et Basirah les situe dans le texte du Coran. Tout tourne dans votre navigateur, sans réseau après le premier chargement. Retard visé : environ 0,3 à 0,5 s.',
     'offline-whisper': 'Whisper (transformers.js, modèle whisper-base) : tourne dans votre navigateur ; le modèle se télécharge à la première utilisation, puis fonctionne sans réseau. Whisper n\'est pas un modèle en flux : attendez quelques secondes de retard. Même moteur que l\'ancienne version.',
     'quranlab-sdk': 'SDK Quran-Lab : créez une clé web sur sdk.quranlab.ai (connexion Hugging Face) pour l\'adresse https de cette page, collez-la ci-dessous. Le SDK ouvre lui-même le micro. La sortie brute s\'affiche dans Diagnostic.',
     'online-test': 'Moteur de TEST du navigateur : l\'audio part chez Google ; précision sur le Coran inconnue ; il s\'arrête de lui-même (relancer à la main). Ce n\'est pas le moteur Basirah.' } as Record<string, string>)[engineKind];
@@ -52,8 +56,13 @@ $('engine').onchange = refreshEngineHelp; refreshEngineHelp();
 let whisperLocal = false;
 (async () => { try { const r = await fetch('models/Xenova/whisper-base/config.json', { cache: 'no-store' }); if (r.ok) { await r.json(); whisperLocal = true; } } catch {} })();
 
+const QA_HF = 'https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/';
+const QA_LOCAL = new URL('models/quran-asr-tiny/', location.href).href;
 async function makeEngine(engineKind_: string = engineKind): Promise<RecognitionEngine> {
   const engineKind = engineKind_;
+  if (engineKind === 'offline-quran') return new QuranCtcEngine({ spawn: () => spawnClassicWorker(QURAN_CTC_WORKER_SRC),
+    models: [QA_LOCAL + 'model.int8.onnx', QA_HF + 'model.int8.onnx', QA_LOCAL + 'model.onnx', QA_HF + 'model.onnx'], tokens: [QA_LOCAL + 'tokens.txt', QA_HF + 'tokens.txt'],
+    ort: [new URL('vendor/ort/', location.href).href, 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/', 'https://unpkg.com/onnxruntime-web@1.27.0/dist/'] });
   if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
   if (engineKind === 'online-relay') {
     const url = $<HTMLInputElement>('relayUrl').value.trim(), tok = $<HTMLInputElement>('tokenUrl').value.trim();
@@ -74,8 +83,8 @@ async function start() {
   err(null); if (running) return;
   try {
     const e = await makeEngine(); finals = []; lastText = ''; if (mode !== 'reading') session.reset();
-    session.attachEngine(e, 'text'); e.on('state', (s, w) => { if (s === 'loading-model') $('engineHelp').textContent = w; diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
-    e.on('result', r => { lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
+    session.attachEngine(e, e instanceof QuranCtcEngine ? 'ctc' : 'text'); e.on('state', (s, w) => { if (s === 'loading-model') $('engineHelp').textContent = w; diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
+    e.on('result', r => { if (r.unit === 'ctc') { return; } lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
     engine = e; tStart = performance.now(); lastKey = ''; tl.length = 0; await e.load(); running = true; setBtn();
     if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else await cap.start();
   } catch (x) { running = false; engine = null; err((x as Error).message); setBtn(); }
@@ -108,9 +117,9 @@ function render(v: SessionView) {
     const hs = mode === 'hifz' ? v.hifz : null;
     box.innerHTML = `<div class="ref">${p.surah}:${p.ayah}</div><div class="ar">` + verse.words.map((w, i) => `<span class="${i < p.word ? 'done' : i === p.word ? 'cur' : (v.live && v.live.surah === p.surah && v.live.ayah === p.ayah && i === v.live.word ? 'lv' : '')}">${w}</span>`).join(' ') + '</div>' + (hs ? '' : '');
   }
-  $('heard').textContent = lastText ? (lastText.length > 160 ? '… ' + lastText.slice(-160) : lastText) : '—';
+  if (v.engine?.unit === 'ctc') $('heard').textContent = v.heard || '—'; else $('heard').textContent = lastText ? (lastText.length > 160 ? '… ' + lastText.slice(-160) : lastText) : '—';
   $('conf').textContent = `confiance ${v.confidence.toFixed(2)} · marge ${v.margin.toFixed(2)}`;
-  const h = v.hifz; if (h) $('hifz').textContent = `ok ${h.ok} · incertain ${h.uncertain} · peut-être omis ${h.missed} · à vérifier ${h.wrong} · répétitions ${h.repeats}` + (v.stuck ? ` — Bloqué ? Indice : ${v.stuck.hint.join(' ')}` : '');
+  const h = v.hifz; if (h && v.engine?.unit === 'ctc') $('hifz').textContent = 'Suivi et détection de blocage : oui. Comptage des erreurs mot par mot : pas encore disponible avec le moteur Basirah Coran.' + (v.stuck ? ` — Bloqué ? Indice : ${v.stuck.hint.join(' ')}` : ''); else if (h) $('hifz').textContent = `ok ${h.ok} · incertain ${h.uncertain} · peut-être omis ${h.missed} · à vérifier ${h.wrong} · répétitions ${h.repeats}` + (v.stuck ? ` — Bloqué ? Indice : ${v.stuck.hint.join(' ')}` : '');
   $('events').textContent = v.recentEvents.map(e => `${e.at.toFixed(1)}s ${e.kind}`).join(' · ') || '—';
   if (mode === 'translation') { const s = tr.subtitles.slice(-6); $('sub').innerHTML = (tr.info().kind, '<div class="mut">' + (s.length ? '' : 'En attente de parole…') + '</div>') + s.map(x => `<div>${x.source}<br><span class="mut">${x.target ?? (x.error ?? 'traduction indisponible')}</span></div>`).join(''); }
 }
@@ -150,7 +159,7 @@ $('benchGo').onclick = async () => {
     for (const f of files.sort((a, b) => a.name.localeCompare(b.name))) { out.textContent = 'Lecture de ' + f.name + '…'; pcms.push({ name: f.name, pcm: await decodeTo16k(f) }); }
     diagLog(`banc : ${pcms.length} fichier(s) décodé(s), ${(pcms.reduce((x, p) => x + p.pcm.length, 0) / 16000).toFixed(1)} s d'audio à 16 kHz`);
     out.textContent = 'Chargement du moteur Whisper…';
-    e = await makeEngine('offline-whisper'); session.attachEngine(e, 'text'); e.on('state', (st, w) => { if (st === 'loading-model') out.textContent = w; diagLog(`banc : ${st} — ${w}`); if (st === 'error') err('Moteur : ' + w); }); await e.load();
+    const bk = engineKind === 'offline-whisper' ? 'offline-whisper' : 'offline-quran'; e = await makeEngine(bk); session.attachEngine(e, e instanceof QuranCtcEngine ? 'ctc' : 'text'); e.on('state', (st, w) => { if (st === 'loading-model') out.textContent = w; diagLog(`banc : ${st} — ${w}`); if (st === 'error') err('Moteur : ' + w); }); await e.load();
     const rows = await runBench(pcms, { engine: e, session, quran: q, pace, now: () => performance.now(), sleep: ms => new Promise(r => setTimeout(r, ms)), onProgress: m => { out.textContent = 'En cours : ' + m; } });
     out.textContent = benchReport(rows, { engine: e.id + (e instanceof WhisperEngine ? ` (${e.dev === 'webgpu' ? 'GPU' : 'processeur'})` : ''), pace }) + '\nStatistiques du moteur : ' + JSON.stringify(e.stats());
   } catch (x) { out.textContent = 'Échec du banc d\'essai : ' + (x as Error).message; err((x as Error).message); }
@@ -162,8 +171,8 @@ const FEATS: [boolean, string, string][] = [
   [true, 'Suivi de position (alignement mots) et modes Prière / Hifz / Lecture', 'code testé en simulation ; pas encore sur voix réelle'],
   [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
   [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
-  [true, 'Banc d\'essai : fichiers audio réels → Whisper → suivi (dans Diagnostic)', 'logique testée avec un moteur FACTICE ; premier vrai passage = chez vous'],
-  [false, 'Décodeur contraint par le texte (millisecondes)', 'écrit et testé en SIMULATION seulement ; pas branché : il attend un modèle en flux (TajweedFormer/le nôtre)'],
+  [false, 'Hors ligne : moteur Basirah Coran (quran-asr-tiny + localisation par lettres)', 'BRANCHÉ, NON EXÉCUTÉ sur un vrai modèle ici : chaîne complète testée avec un modèle SIMULÉ (retard ≈ 0,3 s) ; premier vrai essai = chez vous'],
+  [true, 'Banc d\'essai : fichiers audio réels → moteur choisi (Basirah Coran, ou Whisper) → suivi (dans Diagnostic)', 'logique testée avec un moteur FACTICE ; premier vrai passage = chez vous'],
   [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
   [false, 'Hors ligne : Whisper dans le navigateur', 'IMPLÉMENTÉ, NON EXÉCUTÉ ICI : reprend le moteur de l\'ancienne version (qui fonctionnait chez vous) ; retard de quelques secondes ; modèle téléchargé par votre navigateur à la première utilisation'],
   [false, 'Hors ligne : Zipformer Quran-Lab', 'EN ATTENTE : modèle + runtime sherpa-onnx WebAssembly (voir MODEL-SETUP-QURANLAB.md)'],

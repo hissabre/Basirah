@@ -47,20 +47,57 @@ export class Fbank {
       }
     }
   }
+  private re = new Float64Array(512); private im = new Float64Array(512); private pw = new Float64Array(256);
+  /** Une image : `fr` = les frameLen échantillons BRUTS (déjà mis à l'échelle), modifié sur place. Écrit numBins valeurs à out[off…]. */
+  frameInto(fr: Float64Array, out: Float32Array, off: number) {
+    const o = this.o, N = o.frameLen; if (this.re.length !== o.fft) { this.re = new Float64Array(o.fft); this.im = new Float64Array(o.fft); this.pw = new Float64Array(o.fft / 2); }
+    const re = this.re, im = this.im, power = this.pw;
+    let mean = 0; for (let s = 0; s < N; s++) mean += fr[s]; mean /= N; for (let s = 0; s < N; s++) fr[s] -= mean;
+    for (let s = N - 1; s > 0; s--) fr[s] -= o.preemph * fr[s - 1]; fr[0] -= o.preemph * fr[0];
+    re.fill(0); im.fill(0); for (let s = 0; s < N; s++) re[s] = fr[s] * this.win[s];
+    this.fft(re, im); for (let i = 0; i < o.fft / 2; i++) power[i] = re[i] * re[i] + im[i] * im[i];
+    for (let b = 0; b < o.numBins; b++) { const { start: s0, w } = this.bank[b]; let e = 0; for (let i = 0; i < w.length; i++) e += w[i] * power[s0 + i]; out[off + b] = Math.log(Math.max(e, o.eps)); }
+  }
   /** pcm : Float32 mono 16 kHz. Renvoie [frames × numBins] à plat. */
   compute(pcm: Float32Array): Float32Array {
-    const o = this.o, T = this.numFrames(pcm.length), out = new Float32Array(T * o.numBins), N = o.frameLen, n = pcm.length;
-    const re = new Float64Array(o.fft), im = new Float64Array(o.fft), fr = new Float64Array(N), power = new Float64Array(o.fft / 2);
+    const o = this.o, T = this.numFrames(pcm.length), out = new Float32Array(T * o.numBins), N = o.frameLen, n = pcm.length, fr = new Float64Array(N);
     for (let t = 0; t < T; t++) {
       const start = t * o.frameShift + Math.floor(o.frameShift / 2) - Math.floor(N / 2);
-      let mean = 0;
-      for (let s = 0; s < N; s++) { let k = s + start; while (k < 0 || k >= n) k = k < 0 ? -k - 1 : 2 * n - 1 - k; fr[s] = pcm[k] * o.scale; mean += fr[s]; }
-      mean /= N; for (let s = 0; s < N; s++) fr[s] -= mean;
-      for (let s = N - 1; s > 0; s--) fr[s] -= o.preemph * fr[s - 1]; fr[0] -= o.preemph * fr[0];
-      re.fill(0); im.fill(0); for (let s = 0; s < N; s++) re[s] = fr[s] * this.win[s];
-      this.fft(re, im); for (let i = 0; i < o.fft / 2; i++) power[i] = re[i] * re[i] + im[i] * im[i];
-      for (let b = 0; b < o.numBins; b++) { const { start: s0, w } = this.bank[b]; let e = 0; for (let i = 0; i < w.length; i++) e += w[i] * power[s0 + i]; out[t * o.numBins + b] = Math.log(Math.max(e, o.eps)); }
+      for (let s = 0; s < N; s++) { let k = s + start; while (k < 0 || k >= n) k = k < 0 ? -k - 1 : 2 * n - 1 - k; fr[s] = pcm[k] * o.scale; }
+      this.frameInto(fr, out, t * o.numBins);
     }
+    return out;
+  }
+}
+
+/**
+ * Fbank EN FLUX : chaque image de 10 ms est calculée UNE fois, dès que ses échantillons sont arrivés (identique à Fbank.compute
+ * sur tout l'enregistrement, sauf les 2 dernières images qui attendent leur fin). Les images sont gardées dans un anneau (maxSec).
+ */
+export class StreamingFbank {
+  readonly fb: Fbank; private head: Float32Array; private headN = 0; private ring: Float32Array; private total = 0;
+  private feats: Float32Array; private cap: number; framesDone = 0; private fr: Float64Array;
+  constructor(o: FbankOptions = DEFAULT_FBANK, maxSec = 30) {
+    this.fb = new Fbank(o); this.head = new Float32Array(o.frameLen); this.ring = new Float32Array(1 << 14);
+    this.cap = Math.round(maxSec * o.sampleRate / o.frameShift); this.feats = new Float32Array(this.cap * o.numBins); this.fr = new Float64Array(o.frameLen);
+  }
+  get samples() { return this.total; }
+  push(pcm: Float32Array) {
+    const o = this.fb.o, R = this.ring.length;
+    for (let i = 0; i < pcm.length; i++) { const v = pcm[i]; if (this.headN < this.head.length) this.head[this.headN++] = v; this.ring[(this.total + i) & (R - 1)] = v; }
+    this.total += pcm.length;
+    const half = Math.floor(o.frameLen / 2), c = Math.floor(o.frameShift / 2);
+    for (;;) {
+      const t = this.framesDone, start = t * o.frameShift + c - half, end = start + o.frameLen;
+      if (end > this.total) break;
+      for (let s = 0; s < o.frameLen; s++) { const k = s + start; this.fr[s] = (k < 0 ? this.head[-k - 1] : this.ring[k & (R - 1)]) * o.scale; }
+      this.fb.frameInto(this.fr, this.feats, (t % this.cap) * o.numBins); this.framesDone++;
+    }
+  }
+  /** Copie les images [from, to) (indices absolus, encore dans l'anneau) dans un tableau à plat. */
+  slice(from: number, to: number): Float32Array {
+    const B = this.fb.o.numBins; from = Math.max(from, this.framesDone - this.cap, 0); const out = new Float32Array(Math.max(0, to - from) * B);
+    for (let t = from; t < to; t++) out.set(this.feats.subarray((t % this.cap) * B, (t % this.cap) * B + B), (t - from) * B);
     return out;
   }
 }

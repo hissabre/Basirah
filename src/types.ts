@@ -5,7 +5,9 @@ export interface RecognitionResult {
   /** Texte arabe reconnu pour ce segment. */
   text: string;
   /** 'text' = mots arabes ; 'phoneme' = unités phonétiques (ex. Zipformer Quran-Lab) fournies dans `tokens`. */
-  unit: 'text' | 'phoneme';
+  unit: 'text' | 'phoneme' | 'ctc';
+  /** unit 'ctc' : log-probabilités par image (≈ 40 ms) sur le vocabulaire du modèle, avec l'instant audio de chaque image. */
+  ctc?: { frames: Float32Array[]; times: number[]; vocab: CtcVocab };
   tokens?: string[];
   language: string;
   /** Début du segment, en secondes depuis le début de la session audio (horloge audio, pas horloge murale). */
@@ -53,3 +55,6 @@ export interface Position {
   /** Index global du mot dans le corpus. */
   index: number;
 }
+
+/** Vocabulaire d'un modèle CTC : symbole de chaque identifiant, identifiant du « blanc », identifiants à fondre dans le blanc (séparateur de mots). */
+export interface CtcVocab { tokens: string[]; blank: number; fold: number[] }
