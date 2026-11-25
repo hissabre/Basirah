@@ -1,0 +1,29 @@
+# Essai RÉEL du moteur (vrai modèle, vraies récitations EveryAyah) dans Chrome, sur les serveurs de GitHub. Rien à faire de votre côté.
+name: verify-engine
+on: { workflow_dispatch: { inputs: { engines: { description: 'moteurs', default: 'offline-quran offline-whisper' } } } }
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install && npm install --no-save puppeteer@24
+      - run: npm run build:app
+      - name: Modèle + ONNX Runtime (comme le site publié)
+        run: |
+          mkdir -p public/models/quran-asr-tiny public/vendor/ort
+          for f in model.int8.onnx tokens.txt; do curl -fsSL --retry 3 -o public/models/quran-asr-tiny/$f https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/$f; done
+          for f in ort.wasm.min.js ort-wasm-simd-threaded.wasm ort-wasm-simd-threaded.mjs; do curl -fsSL --retry 3 -o public/vendor/ort/$f https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/$f; done
+      - name: Récitations EveryAyah (2 récitants, débuts de sourate, milieu, versets courts et longs)
+        run: |
+          mkdir -p audio
+          for r in Alafasy_128kbps:alafasy Husary_128kbps:husary; do d=${r%%:*}; n=${r##*:}
+            for v in 067001 067002 067003 002255 036001 036002 036003 018001 055013 112001 112002 001002 001003 078001 078002; do
+              curl -fsSL --retry 3 -o audio/${n}_$v.mp3 https://everyayah.com/data/$d/$v.mp3 || echo "manque $d/$v"; done; done
+          ls audio | wc -l
+      - run: node tools/verify-engine.mjs public audio report.txt ${{ inputs.engines }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: verify-engine-report, path: report.txt }
