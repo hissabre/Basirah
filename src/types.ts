@@ -7,7 +7,7 @@ export interface RecognitionResult {
   /** 'text' = mots arabes ; 'phoneme' = unités phonétiques (ex. Zipformer Quran-Lab) fournies dans `tokens`. */
   unit: 'text' | 'phoneme' | 'ctc';
   /** unit 'ctc' : log-probabilités par image (≈ 40 ms) sur le vocabulaire du modèle, avec l'instant audio de chaque image. */
-  ctc?: { frames: Float32Array[]; times: number[]; vocab: CtcVocab };
+  ctc?: { frames?: Float32Array[]; times?: number[]; letters?: { id: number; t: number }[]; end?: number; vocab: CtcVocab };
   tokens?: string[];
   language: string;
   /** Début du segment, en secondes depuis le début de la session audio (horloge audio, pas horloge murale). */

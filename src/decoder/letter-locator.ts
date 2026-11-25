@@ -55,6 +55,17 @@ export class LetterLocator {
     this.lastEmit = b; this.sawBlank = false; this.H.push(b); this.letters++; if (this.H.length > 64) this.H.shift();
     return this.step();
   }
+  /**
+   * Remplace l'historique : `ids` = lettres sûres (anciennes) suivies de `tent` lettres provisoires (la dernière seconde,
+   * que le modèle corrigera à la passe suivante). La position suit les lettres provisoires (réactivité), la décision de saut
+   * et la recherche s'appuient aussi sur les lettres sûres.
+   */
+  setHistory(ids: number[], tent: number): LocatorOut | null {
+    if (!ids.length) return null;
+    const same = ids.length === this.H.length && ids.every((v, i) => v === this.H[i]); if (same) return null;
+    this.H = ids.slice(-64); this.tent = Math.min(tent, this.H.length); this.letters = ids.length; return this.step();
+  }
+  private tent = 0;
   /** Ajoute directement une lettre (tests). */
   pushLetter(id: number) { this.H.push(id); this.letters++; if (this.H.length > 64) this.H.shift(); return this.step(); }
 
@@ -79,7 +90,7 @@ export class LetterLocator {
   private candidates(): number[] {
     const H = this.H, out = new Set<number>();
     for (const [n, idx] of [[7, this.idx7], [5, this.idx5]] as [number, Map<number, number[]>][]) {
-      for (const skip of [0, 1]) { // aussi sans la dernière lettre (si elle est fausse)
+      for (const skip of [...new Set([0, 1, this.tent, this.tent + 1])]) { // aussi sans la dernière lettre, et en s'arrêtant aux lettres sûres
         if (H.length - skip < n) continue; const k = this.key(H.length - 1 - skip, n, H); const l = idx.get(k); if (!l) continue;
         if (l.length > 400) continue; for (const e of l) out.add(e + skip);
       }
@@ -124,3 +135,25 @@ export class LetterLocator {
   }
 }
 function push(m: Map<number, number[]>, k: number, v: number) { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); }
+
+/**
+ * Flux de lettres « sûres + provisoires » à partir de passes successives du modèle sur une fenêtre glissante.
+ * Une lettre devient sûre quand le modèle a entendu `commitSec` d'audio après elle (ce modèle n'est fiable qu'avec ce recul).
+ * Raccord entre passes : la dernière lettre sûre est retrouvée (même lettre, ± 0,12 s) et on continue après elle.
+ */
+export class LetterStream {
+  committed: { id: number; t: number }[] = [];
+  constructor(public commitSec = 1.0) {}
+  reset() { this.committed = []; }
+  update(L: { id: number; t: number }[], end: number): { ids: number[]; tent: number } {
+    const C = this.committed, last = C[C.length - 1];
+    let fresh = L.filter(x => x.t <= end - this.commitSec);
+    if (last) {
+      let j = -1; for (let i = fresh.length - 1; i >= 0; i--) if (fresh[i].id === last.id && Math.abs(fresh[i].t - last.t) <= 0.12) { j = i; break; }
+      fresh = j >= 0 ? fresh.slice(j + 1) : fresh.filter(x => x.t > last.t + 0.06);
+    }
+    for (const x of fresh) C.push(x); if (C.length > 400) C.splice(0, C.length - 200);
+    const lt = C.length ? C[C.length - 1].t : -1, tent = L.filter(x => x.t > lt + 0.06 && x.t > end - this.commitSec - 0.001);
+    return { ids: [...C.slice(-64).map(x => x.id), ...tent.map(x => x.id)], tent: tent.length };
+  }
+}

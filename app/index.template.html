@@ -16,7 +16,7 @@ input[type=number]{width:80px}
 <h1>Basirah <small class="mut">version de test</small></h1>
 <div class="row" role="tablist">
 <button data-mode="prayer" class="sel">Prière</button><button data-mode="hifz">Hifz</button><button data-mode="reading">Lecture</button><button data-mode="translation">Traduction</button></div>
-<div class="row"><select id="engine" aria-label="Moteur"></select><button id="go">Démarrer</button></div>
+<div class="row"><select id="engine" aria-label="Moteur"></select><button id="go">Démarrer</button><button id="fileGo" title="Réciter depuis un enregistrement (audio ou vidéo)">Depuis un fichier</button><input id="recFile" type="file" accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.ogg,.webm" hidden></div>
 <div class="row"><select id="react" aria-label="Réactivité"><option value="safe">Réactivité : sûre (2 accords)</option><option value="fast">Réactivité : rapide (dernier mot retenu) — à comparer</option></select></div>
 <div class="mut"><small id="engineHelp"></small></div>
 <div id="relayBox" class="row" hidden><input id="relayUrl" placeholder="wss://…/relais" style="flex:1"><input id="tokenUrl" placeholder="https://…/jeton" style="flex:1"></div>

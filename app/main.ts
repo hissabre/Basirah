@@ -57,12 +57,12 @@ let whisperLocal = false;
 (async () => { try { const r = await fetch('models/Xenova/whisper-base/config.json', { cache: 'no-store' }); if (r.ok) { await r.json(); whisperLocal = true; } } catch {} })();
 
 const QA_HF = 'https://huggingface.co/Abdou/quran-asr-tiny/resolve/main/';
-const QA_LOCAL = new URL('models/quran-asr-tiny/', location.href).href;
+const QA_LOCAL = new URL('models/quran-asr-tiny/', document.baseURI).href;
 async function makeEngine(engineKind_: string = engineKind): Promise<RecognitionEngine> {
   const engineKind = engineKind_;
   if (engineKind === 'offline-quran') return new QuranCtcEngine({ spawn: () => spawnClassicWorker(QURAN_CTC_WORKER_SRC),
     models: [QA_LOCAL + 'model.int8.onnx', QA_HF + 'model.int8.onnx', QA_LOCAL + 'model.onnx', QA_HF + 'model.onnx'], tokens: [QA_LOCAL + 'tokens.txt', QA_HF + 'tokens.txt'],
-    ort: [new URL('vendor/ort/', location.href).href, 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/', 'https://unpkg.com/onnxruntime-web@1.27.0/dist/'] });
+    ort: [new URL('vendor/ort/', document.baseURI).href, 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/', 'https://unpkg.com/onnxruntime-web@1.27.0/dist/'] });
   if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
   if (engineKind === 'online-relay') {
     const url = $<HTMLInputElement>('relayUrl').value.trim(), tok = $<HTMLInputElement>('tokenUrl').value.trim();
@@ -79,19 +79,32 @@ async function makeEngine(engineKind_: string = engineKind): Promise<Recognition
   }
   return new WebSpeechEngine();
 }
-async function start() {
+async function start(file?: File) {
   err(null); if (running) return;
+  let pcm: Float32Array | null = null; if (file) { $('engineHelp').textContent = 'Lecture de ' + file.name + '…'; pcm = await decodeTo16k(file).catch(x => { err('Fichier illisible : ' + (x as Error).message); return null; }); if (!pcm) return; }
   try {
     const e = await makeEngine(); finals = []; lastText = ''; if (mode !== 'reading') session.reset();
     session.attachEngine(e, e instanceof QuranCtcEngine ? 'ctc' : 'text'); e.on('state', (s, w) => { if (s === 'loading-model') $('engineHelp').textContent = w; diagLog(`moteur ${e.id} : ${s} — ${w}`); if (s === 'error' || s === 'network-disconnected') err(`Moteur ${e.id} : ${w}`); if ((e instanceof WebSpeechEngine || e instanceof TajweedFormerEngine) && (s === 'idle' || s === 'error') && running) { running = false; if (s === 'idle' && /JAMAIS|aucun son/.test(w)) err(w); } setBtn(); });
     e.on('result', r => { if (r.unit === 'ctc') { return; } lastText = r.text; tlog(`résultat ${r.isFinal ? 'FINAL' : 'provisoire'} · ${r.text.trim().split(/\s+/).filter(Boolean).length} mots`); if (r.isFinal) { finals.push(r.text); if (finals.length > 6) finals.shift(); } });
     engine = e; tStart = performance.now(); lastKey = ''; tl.length = 0; await e.load(); running = true; setBtn();
-    if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else await cap.start();
+    if (e instanceof WebSpeechEngine) e.begin(); else if (e instanceof TajweedFormerEngine) { void e.begin(); } else if (pcm) playPcm(pcm); else await cap.start();
   } catch (x) { running = false; engine = null; err((x as Error).message); setBtn(); }
 }
-async function stop() { running = false; try { await engine?.flush(); await engine?.dispose(); } catch {} if (!(engine instanceof WebSpeechEngine) && !(engine instanceof TajweedFormerEngine)) await cap.stop().catch(() => {}); engine = null; setBtn(); }
+let filePlay: { ac: AudioContext; timer: number } | null = null;
+/** Récitation depuis un fichier : même chemin que le micro (paquets de 100 ms au rythme réel), avec le son. */
+function playPcm(pcm: Float32Array) {
+  const ac = new AudioContext({ sampleRate: 16000 }); const b = ac.createBuffer(1, pcm.length, 16000); b.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0);
+  const src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); void ac.resume().catch(() => {}); src.start(); let sent = 0; const p0 = performance.now();
+  // horloge : celle du son s'il joue, sinon l'horloge du navigateur (si le son est bloqué, la reconnaissance continue quand même)
+  const timer = window.setInterval(() => { const el = ac.state === 'running' && ac.currentTime > 0 ? ac.currentTime : (performance.now() - p0) / 1000; const upto = Math.min(pcm.length, Math.floor(el * 16000)); while (sent + 1600 <= upto) { engine?.pushAudio(pcm.subarray(sent, sent + 1600), sent / 16000); sent += 1600; }
+    if (sent + 1600 > pcm.length) { if (sent < pcm.length) engine?.pushAudio(pcm.subarray(sent), sent / 16000); sent = pcm.length; void stop(); } }, 50);
+  filePlay = { ac, timer }; diagLog(`fichier : ${(pcm.length / 16000).toFixed(1)} s, lu au rythme réel`);
+}
+async function stop() { if (filePlay) { clearInterval(filePlay.timer); void filePlay.ac.close().catch(() => {}); filePlay = null; } running = false; try { await engine?.flush(); await engine?.dispose(); } catch {} if (!(engine instanceof WebSpeechEngine) && !(engine instanceof TajweedFormerEngine) && cap) await cap.stop().catch(() => {}); engine = null; setBtn(); }
 const setBtn = () => { $('go').textContent = running ? 'Arrêter' : 'Démarrer'; $('go').classList.toggle('on', running); };
 $('go').onclick = () => running ? stop() : start();
+$('fileGo').onclick = () => { if (running) { void stop(); return; } $<HTMLInputElement>('recFile').value = ''; $<HTMLInputElement>('recFile').click(); };
+$<HTMLInputElement>('recFile').onchange = () => { const f = $<HTMLInputElement>('recFile').files?.[0]; if (f) void start(f); };
 
 // ── Modes ─────────────────────────────────────────────────────────────────────
 let mode: Mode = 'prayer';
@@ -171,7 +184,7 @@ const FEATS: [boolean, string, string][] = [
   [true, 'Suivi de position (alignement mots) et modes Prière / Hifz / Lecture', 'code testé en simulation ; pas encore sur voix réelle'],
   [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
   [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
-  [true, 'Hors ligne : moteur Basirah Coran (quran-asr-tiny + localisation par lettres)', 'ESSAYÉ sur 30 vraies récitations (Alafasy, Husary), chaque verset seul, départ à froid : 18/30 trouvés, médiane 5,3 s, puis suit sans retard jusqu\'au dernier mot (Whisper : 11/30, 29 s). Pas encore essayé avec votre micro.'],
+  [true, 'Hors ligne : moteur Basirah Coran (quran-asr-tiny + localisation par lettres)', 'ESSAYÉ sur de vraies récitations : votre enregistrement de la sourate 92 (confirmé à 4 s, suivi verset par verset jusqu\'à 92:18) et l\'enregistrement Tarteel 21:8–12 (confirmé à 3 s). Bouton « Depuis un fichier » pour essayer avec n\'importe quel enregistrement.'],
   [true, 'Banc d\'essai : fichiers audio réels → moteur choisi (Basirah Coran, ou Whisper) → suivi (dans Diagnostic)', 'logique testée avec un moteur FACTICE ; premier vrai passage = chez vous'],
   [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
   [false, 'Hors ligne : Whisper dans le navigateur', 'IMPLÉMENTÉ, NON EXÉCUTÉ ICI : reprend le moteur de l\'ancienne version (qui fonctionnait chez vous) ; retard de quelques secondes ; modèle téléchargé par votre navigateur à la première utilisation'],

@@ -45,7 +45,7 @@ export class QuranCtcEngine implements RecognitionEngine {
   readonly kind = 'offline' as const; readonly id: string;
   private fns: { [K in keyof RecognizerEvents]?: RecognizerEvents[K][] } = {};
   private w: WorkerLike | null = null; private fb = new StreamingFbank(); private base: number | null = null;
-  private busy = false; private ready = false; private lastRunFrame = 0; private lastEmitT = -1; private runId = 0; private hop: number;
+  private busy = false; private ready = false; private lastRunFrame = 0; private runId = 0; private hop: number;
   private peak = 0; private lat: number[] = []; private flushWait: (() => void) | null = null; private finalRun = false;
   vocab: CtcVocab | null = null; info: Record<string, unknown> = {}; runs = 0; skippedSilent = 0; frames = 0; lastMs: number | null = null;
   constructor(private o: QuranCtcOptions) { this.id = o.id ?? 'quran-asr-tiny (hors ligne)'; this.hop = o.minHopSec ?? 0.24; }
@@ -80,7 +80,7 @@ export class QuranCtcEngine implements RecognitionEngine {
     if (!this.finalRun && (F - this.lastRunFrame < this.hop * 100 || W < 50)) return;
     const base = this.base ?? 0;
     if (!this.finalRun && this.peak < 0.004) { // silence : rien à reconnaître, on économise la batterie
-      this.skippedSilent++; this.lastRunFrame = F; this.lastEmitT = Math.max(this.lastEmitT, base + F * 0.01 - (this.o.guardSec ?? 0.12)); this.peak = 0; return;
+      this.skippedSilent++; this.lastRunFrame = F; this.peak = 0; return;
     }
     const x = this.fb.slice(F - W, F), voiced = this.peak > 0.02; this.peak = 0;
     this.busy = true; this.lastRunFrame = F; this.runs++;
@@ -94,19 +94,16 @@ export class QuranCtcEngine implements RecognitionEngine {
     this.lastMs = d.ms; this.lat.push(d.ms); if (this.lat.length > 50) this.lat.shift();
     this.hop = Math.max(this.o.minHopSec ?? 0.24, Math.min(1.2, d.ms / 1000 * 1.15));
     const n: number = d.n, V: number = d.V, lp: Float32Array = d.lp, dt = (d.t1 - d.t0 + (d.pad ?? 0) * 0.01) / Math.max(1, n);
-    const guard = this.finalRun ? 0 : (this.o.guardSec ?? 0.12), frames: Float32Array[] = [], times: number[] = [];
-    let text = '', prev = -1; const v = this.vocab!;
+    // Lettres de TOUTE la fenêtre avec leur instant (le flux de lettres décide lesquelles sont sûres) ; l'audio réel s'arrête à t1.
+    const v = this.vocab!, letters: { id: number; t: number }[] = []; let prev = -1;
     for (let k = 0; k < n; k++) {
-      const t = d.t0 + (k + 0.5) * dt; if (t <= this.lastEmitT || t > d.t1 - guard) continue;
-      const f = lp.subarray(k * V, k * V + V); frames.push(f); times.push(t); this.lastEmitT = t;
-      let g = 0; for (let i = 1; i < V; i++) if (f[i] > f[g]) g = i;
-      if (g !== prev && g !== v.blank) text += v.fold.includes(g) ? ' ' : v.tokens[g]; prev = g;
+      const t = d.t0 + (k + 0.5) * dt; if (t > d.t1 + 0.02) break;
+      let g = 0; for (let i = 1; i < V; i++) if (lp[k * V + i] > lp[k * V + g]) g = i;
+      if (g !== prev && g !== v.blank && !v.fold.includes(g)) letters.push({ id: g, t }); prev = g;
     }
-    this.frames += frames.length;
-    if (frames.length) {
-      const r: RecognitionResult = { text, unit: 'ctc', ctc: { frames, times, vocab: v }, language: 'ar', audioStart: times[0], audioEnd: times[times.length - 1], receivedAt: performance.now(), isFinal: true, confidence: null, engine: 'offline', engineId: this.id };
-      (this.fns.result as ((r: RecognitionResult) => void)[] | undefined)?.forEach(f => f(r));
-    }
+    this.frames += n;
+    const r: RecognitionResult = { text: '', unit: 'ctc', ctc: { letters, end: d.t1, vocab: v }, language: 'ar', audioStart: d.t0, audioEnd: d.t1, receivedAt: performance.now(), isFinal: true, confidence: null, engine: 'offline', engineId: this.id };
+    (this.fns.result as ((r: RecognitionResult) => void)[] | undefined)?.forEach(f => f(r));
     if (this.finalRun) { this.finalRun = false; const f = this.flushWait; this.flushWait = null; f?.(); return; }
     this.maybeRun();
   }
