@@ -18,6 +18,10 @@ async function bytes(url,label){
   else buf=new Uint8Array(await r.arrayBuffer());
   try{if(c)await tmo(c.put(url,new Response(buf.slice(),{headers:{'content-type':'application/octet-stream'}})),5000)}catch(e){}
   return buf}
+async function bytesAny(u,label){if(!/\.parts\.json$/.test(u))return bytes(u,label);
+  const m=JSON.parse(new TextDecoder().decode(await bytes(u,label))),base=u.replace(/[^/]*$/,''),ch=[];let n=0;
+  for(const p of m.parts){const b=atob(new TextDecoder().decode(await bytes(base+p,label)).trim()),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);ch.push(a);n+=a.length}
+  if(m.size&&n!==m.size)throw new Error('modèle incomplet ('+n+' / '+m.size+' octets)');const out=new Uint8Array(n);let o=0;for(const c of ch){out.set(c,o);o+=c.length}return out}
 function lsm(a,o,V){let m=-1e30;for(let i=0;i<V;i++)if(a[o+i]>m)m=a[o+i];let s=0;for(let i=0;i<V;i++)s+=Math.exp(a[o+i]-m);return m+Math.log(s)}
 async function run(x,T){
   const feeds={};feeds[inX]=new RT.Tensor('float32',x,[1,T,B]);
@@ -34,7 +38,7 @@ self.onmessage=async e=>{const d=e.data;try{
   let tok=null,tokUrl='',er=[];for(const u of d.tokens){try{tok=new TextDecoder().decode(await bytes(u,'jetons'));tokUrl=u;break}catch(x){er.push(String(x&&x.message||x))}}
   if(!tok)throw new Error('liste des jetons introuvable : '+er.join(' ; '));
   const lines=tok.split(/\r?\n/).filter(l=>l.trim());const bl=lines.findIndex(l=>/^<(blk|blank)>/.test(l));blank=bl>=0?+lines[bl].trim().split(/\s+/).pop():0;
-  let url='';er=[];for(const u of d.models){try{const b=await bytes(u,'modèle');post({prog:{label:'préparation du modèle',pct:100}});S=await RT.InferenceSession.create(b,{executionProviders:['wasm'],graphOptimizationLevel:'all'});url=u;break}catch(x){er.push(u.split('/').slice(-3).join('/')+' : '+String(x&&x.message||x))}}
+  let url='';er=[];for(const u of d.models){try{const b=await bytesAny(u,'modèle');post({prog:{label:'préparation du modèle',pct:100}});S=await RT.InferenceSession.create(b,{executionProviders:['wasm'],graphOptimizationLevel:'all'});url=u;break}catch(x){er.push(u.split('/').slice(-3).join('/')+' : '+String(x&&x.message||x))}}
   if(!S)throw new Error('modèle impossible à charger : '+er.join(' ; '));
   inX=S.inputNames.find(n=>!/len/i.test(n));inL=S.inputNames.find(n=>/len/i.test(n));outLP=S.outputNames.find(n=>!/len/i.test(n));outLen=S.outputNames.find(n=>/len/i.test(n));
   const z=new Float32Array(100*B).fill(-10);let t0=performance.now(),w;

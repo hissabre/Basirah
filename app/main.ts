@@ -61,7 +61,7 @@ const QA_LOCAL = new URL('models/quran-asr-tiny/', document.baseURI).href;
 async function makeEngine(engineKind_: string = engineKind): Promise<RecognitionEngine> {
   const engineKind = engineKind_;
   if (engineKind === 'offline-quran') return new QuranCtcEngine({ spawn: () => spawnClassicWorker(QURAN_CTC_WORKER_SRC),
-    models: [QA_LOCAL + 'model.int8.onnx', QA_HF + 'model.int8.onnx', QA_LOCAL + 'model.onnx', QA_HF + 'model.onnx'], tokens: [QA_LOCAL + 'tokens.txt', QA_HF + 'tokens.txt'],
+    models: [QA_LOCAL + 'model.int8.onnx', QA_LOCAL + 'model.int8.parts.json', QA_HF + 'model.int8.onnx', QA_LOCAL + 'model.onnx', QA_HF + 'model.onnx'], tokens: [QA_LOCAL + 'tokens.txt', QA_HF + 'tokens.txt'],
     ort: [new URL('vendor/ort/', document.baseURI).href, 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/', 'https://unpkg.com/onnxruntime-web@1.27.0/dist/'] });
   if (engineKind === 'offline-zipformer') throw new Error('Moteur hors ligne Zipformer : le modèle Quran-Lab (.onnx, tokens, lexique) et le runtime sherpa-onnx WebAssembly ne sont pas installés dans cette page. Rien n\'a été simulé.');
   if (engineKind === 'online-relay') {
