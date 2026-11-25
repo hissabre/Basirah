@@ -171,7 +171,7 @@ const FEATS: [boolean, string, string][] = [
   [true, 'Suivi de position (alignement mots) et modes Prière / Hifz / Lecture', 'code testé en simulation ; pas encore sur voix réelle'],
   [true, 'Capture micro (une autorisation, un flux)', 'testé avec un micro factice ; à valider avec votre micro'],
   [speechOk, 'Moteur TEST du navigateur (Google)', speechOk ? 'disponible — ce n\'est pas le moteur Basirah ; précision Coran inconnue' : 'non supporté par ce navigateur'],
-  [false, 'Hors ligne : moteur Basirah Coran (quran-asr-tiny + localisation par lettres)', 'BRANCHÉ, NON EXÉCUTÉ sur un vrai modèle ici : chaîne complète testée avec un modèle SIMULÉ (retard ≈ 0,3 s) ; premier vrai essai = chez vous'],
+  [true, 'Hors ligne : moteur Basirah Coran (quran-asr-tiny + localisation par lettres)', 'ESSAYÉ sur 30 vraies récitations (Alafasy, Husary), chaque verset seul, départ à froid : 18/30 trouvés, médiane 5,3 s, puis suit sans retard jusqu\'au dernier mot (Whisper : 11/30, 29 s). Pas encore essayé avec votre micro.'],
   [true, 'Banc d\'essai : fichiers audio réels → moteur choisi (Basirah Coran, ou Whisper) → suivi (dans Diagnostic)', 'logique testée avec un moteur FACTICE ; premier vrai passage = chez vous'],
   [false, 'TajweedFormer V4 (SDK Quran-Lab)', 'IMPLÉMENTÉ MAIS NON TESTÉ : clé web + premier essai requis ; alignement sur ses sons à écrire après avoir vu la sortie brute'],
   [false, 'Hors ligne : Whisper dans le navigateur', 'IMPLÉMENTÉ, NON EXÉCUTÉ ICI : reprend le moteur de l\'ancienne version (qui fonctionnait chez vous) ; retard de quelques secondes ; modèle téléchargé par votre navigateur à la première utilisation'],
