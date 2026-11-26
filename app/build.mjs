@@ -16,3 +16,6 @@ writeFileSync('public/index.html', html); console.log('public/index.html', (html
     .replace('%%TR%%', () => JSON.stringify(TR).replace(/<\/script/g, '<\\/script')).replace('%%CODE%%', () => gjs.replace(/<\/script/g, '<\\/script'));
   writeFileSync('public/glasses.html', g); console.log('public/glasses.html', (g.length / 1e6).toFixed(2), 'Mo');
 }
+
+// Installateur Windows (double-clic) des lunettes
+import { mkdirSync } from 'node:fs'; mkdirSync('public/installer', { recursive: true }); copyFileSync('app/installer/Installer-Basirah-lunettes.bat', 'public/installer/Installer-Basirah-lunettes.bat');
