@@ -2,7 +2,13 @@ plugins { id 'com.android.application' }
 android {
   namespace 'app.basirah.glasses'
   compileSdk 34
-  defaultConfig { applicationId 'app.basirah.glasses'; minSdk 24; targetSdk 34; versionCode (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger(); versionName "0.1." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0') }
+  defaultConfig {
+    applicationId 'app.basirah.glasses'
+    minSdk 24
+    targetSdk 34
+    versionCode = Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+    versionName = '0.1.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+  }
   // Clé de la version BÊTA (publique, dans le dépôt) : les mises à jour s'installent par-dessus. À remplacer avant une diffusion publique.
   signingConfigs { beta { storeFile file('../beta.keystore'); storePassword 'basirahbeta'; keyAlias 'basirah'; keyPassword 'basirahbeta' } }
   buildTypes { release { signingConfig signingConfigs.beta; minifyEnabled false } debug { signingConfig signingConfigs.beta } }
