@@ -132,7 +132,7 @@ export class Session {
         if (!prev || prev.index !== np.index) {
           const jump = !!prev && (np.index < prev.index || np.index > prev.index + 8);
           if (!prev || jump) { this.events.push({ kind: prev ? 'jump' : 'confirmed', from: prev, to: np, words: prev ? np.index - prev.index : 0, at: r.audioEnd } as AlignEvent & { at: number }); if (this.events.length > 30) this.events.shift(); }
-          this.pos = np;
+          this.pos = np; if (this.mode === 'hifz') { this.hifz.progress(this.tickClock); this.stuck = null; }
         }
         this.status = 'tracking';
       } else this.status = this.pos ? 'uncertain' : 'searching';
@@ -144,8 +144,9 @@ export class Session {
     return qi >= 0 ? this.d.quran.position(qi) : null;
   }
   /** À appeler régulièrement avec l'horloge audio : détecte le blocage en Hifz. */
+  private tickClock = 0;
   tick(nowSec: number) {
-    this.clock = nowSec;
+    this.clock = nowSec; this.tickClock = nowSec;
     if (this.mode === 'hifz' && this.pos) { const s = this.hifz.checkStuck(nowSec, this.pos.index); if (s.stuck) { this.stuck = { hint: s.hint }; this.events.push({ kind: 'lost', from: this.pos, to: null, words: 0, at: nowSec }); this.note('Hifz : récitant bloqué'); this.emit(); } }
   }
   /** Continuation correcte à la demande (texte original). */

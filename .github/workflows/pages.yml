@@ -28,6 +28,19 @@ jobs:
           mkdir -p public/vendor/ort
           for f in ort.wasm.min.js ort-wasm-simd-threaded.wasm ort-wasm-simd-threaded.mjs; do curl -fsSL --retry 3 -o public/vendor/ort/$f https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/$f; done
           ls -la public/vendor/ort
+      # Application Android pour les lunettes (INMO Air 2) : page lunettes + modèle + ONNX Runtime à l'intérieur (100 % hors ligne).
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.7' }
+      - name: Construire l'APK lunettes
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          cp public/glasses.html android/app/src/main/assets/www/
+          cp -r public/models public/vendor android/app/src/main/assets/www/
+          gradle -p android assembleRelease --no-daemon -q
+          cp android/app/build/outputs/apk/release/app-release.apk public/basirah-glasses.apk
+          ls -la public/basirah-glasses.apk
       - uses: actions/upload-pages-artifact@v3
         with: { path: public }
   deploy:

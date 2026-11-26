@@ -46,9 +46,9 @@ export class QuranCtcEngine implements RecognitionEngine {
   private fns: { [K in keyof RecognizerEvents]?: RecognizerEvents[K][] } = {};
   private w: WorkerLike | null = null; private fb = new StreamingFbank(); private base: number | null = null;
   private busy = false; private ready = false; private lastRunFrame = 0; private runId = 0; private hop: number;
-  private peak = 0; private lat: number[] = []; private flushWait: (() => void) | null = null; private finalRun = false;
+  private peak = 0; private lat: number[] = []; private win = 8; private flushWait: (() => void) | null = null; private finalRun = false;
   vocab: CtcVocab | null = null; info: Record<string, unknown> = {}; runs = 0; skippedSilent = 0; frames = 0; lastMs: number | null = null;
-  constructor(private o: QuranCtcOptions) { this.id = o.id ?? 'quran-asr-tiny (hors ligne)'; this.hop = o.minHopSec ?? 0.24; }
+  constructor(private o: QuranCtcOptions) { this.id = o.id ?? 'quran-asr-tiny (hors ligne)'; this.hop = o.minHopSec ?? 0.24; this.win = o.windowSec ?? 8; }
   on<K extends keyof RecognizerEvents>(ev: K, fn: RecognizerEvents[K]) { (this.fns[ev] ??= [] as never).push(fn as never); }
   private st(s: RecognizerState, why: string) { (this.fns.state as ((s: string, w: string) => void)[] | undefined)?.forEach(f => f(s, why)); }
 
@@ -76,7 +76,7 @@ export class QuranCtcEngine implements RecognitionEngine {
   }
   private maybeRun() {
     if (!this.ready || this.busy || !this.w) return;
-    const F = this.fb.framesDone, W = Math.min(F, Math.round((this.o.windowSec ?? 8) * 100));
+    const F = this.fb.framesDone, W = Math.min(F, Math.round(this.win * 100));
     if (!this.finalRun && (F - this.lastRunFrame < this.hop * 100 || W < 50)) return;
     const base = this.base ?? 0;
     if (!this.finalRun && this.peak < 0.004) { // silence : rien à reconnaître, on économise la batterie
@@ -93,6 +93,8 @@ export class QuranCtcEngine implements RecognitionEngine {
     if (!d.lp) return;
     this.lastMs = d.ms; this.lat.push(d.ms); if (this.lat.length > 50) this.lat.shift();
     this.hop = Math.max(this.o.minHopSec ?? 0.24, Math.min(1.2, d.ms / 1000 * 1.15));
+    // appareil lent (lunettes) : fenêtre plus courte (6 s, mesuré presque aussi juste) ; revient à la normale si la passe redevient rapide
+    if (d.ms > 650 && this.win > 6) this.win = 6; else if (d.ms < 250 && this.win < (this.o.windowSec ?? 8)) this.win = this.o.windowSec ?? 8;
     const n: number = d.n, V: number = d.V, lp: Float32Array = d.lp, dt = (d.t1 - d.t0 + (d.pad ?? 0) * 0.01) / Math.max(1, n);
     // Lettres de TOUTE la fenêtre avec leur instant (le flux de lettres décide lesquelles sont sûres) ; l'audio réel s'arrête à t1.
     const v = this.vocab!, letters: { id: number; t: number }[] = []; let prev = -1;
@@ -117,7 +119,7 @@ export class QuranCtcEngine implements RecognitionEngine {
   async dispose() { try { this.w?.terminate?.(); } catch { /* */ } this.w = null; this.ready = false; }
   stats() {
     const l = [...this.lat].sort((a, b) => a - b);
-    return { queued: this.busy ? 1 : 0, lastLatencyMs: this.lastMs, passeMediane: l.length ? Math.round(l[l.length >> 1]) : null, pas: +this.hop.toFixed(2), passes: this.runs, silences: this.skippedSilent, images: this.frames, ...this.info } as { queued: number; lastLatencyMs: number | null };
+    return { queued: this.busy ? 1 : 0, lastLatencyMs: this.lastMs, passeMediane: l.length ? Math.round(l[l.length >> 1]) : null, pas: +this.hop.toFixed(2), passes: this.runs, fenetre: this.win, silences: this.skippedSilent, images: this.frames, ...this.info } as { queued: number; lastLatencyMs: number | null };
   }
 }
 

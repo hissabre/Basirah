@@ -41,9 +41,12 @@ export class HifzTracker {
   }
   /** Suite correcte à la demande (texte original, avec voyelles). */
   next(index: number, n = 3): string[] {
-    const db = this.db, v = db.verseOf(index), j = db.words[index].j, out = v.words.slice(j + 1, j + 1 + n);
+    const db = this.db, out: string[] = [];
+    for (let i = index + 1; i < db.words.length && out.length < n; i++) { const w = db.words[i]; out.push(db.verses[w.v].words[w.j]); } // continue dans le verset suivant
     return out;
   }
+  /** Progrès constaté par un autre chemin (moteur acoustique) : relance la détection de blocage. */
+  progress(nowSec: number) { this.lastProgress = nowSec; this.stuckFired = false; }
   summary() { let ok = 0, missed = 0, wrong = 0, uncertain = 0; for (const s of this.status.values()) { if (s === 'ok') ok++; else if (s === 'missed') missed++; else if (s === 'wrong') wrong++; else uncertain++; }
     return { words: this.status.size, ok, missed, wrong, uncertain, repeats: this.repeats, versesCompleted: this.verses.length }; }
 }

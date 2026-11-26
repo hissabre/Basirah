@@ -6,3 +6,7 @@ models/**
 *.onnx
 .env
 basirah.config.json
+android/app/src/main/assets/
+android/app/build/
+android/.gradle/
+android/build/
