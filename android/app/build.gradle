@@ -41,14 +41,14 @@ android {
       dimension 'device'
       manifestPlaceholders = [orientation: 'landscape']
       resValue 'string', 'app_name', 'Basirah'
-      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/glasses.html?glasses=1'
+      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/app.html?glasses=1'
     }
     phone {
       dimension 'device'
       applicationIdSuffix '.phone'
       manifestPlaceholders = [orientation: 'unspecified']
-      resValue 'string', 'app_name', 'Basirah (téléphone)'
-      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/glasses.html?phone=1'
+      resValue 'string', 'app_name', 'Basirah'
+      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/app.html?phone=1'
     }
   }
 

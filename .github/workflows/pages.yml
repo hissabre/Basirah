@@ -37,7 +37,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p android/app/src/main/assets/www
-          cp public/glasses.html android/app/src/main/assets/www/
+          cp public/glasses.html public/app.html android/app/src/main/assets/www/
           cp -r public/models public/vendor android/app/src/main/assets/www/
           gradle -p android assembleGlassesRelease assemblePhoneRelease --no-daemon -q
           cp android/app/build/outputs/apk/glasses/release/app-glasses-release.apk public/basirah-glasses.apk

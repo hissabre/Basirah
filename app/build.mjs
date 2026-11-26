@@ -19,3 +19,11 @@ writeFileSync('public/index.html', html); console.log('public/index.html', (html
 
 // Installateur Windows (double-clic) des lunettes
 import { mkdirSync } from 'node:fs'; mkdirSync('public/installer', { recursive: true }); copyFileSync('app/installer/Installer-Basirah-lunettes.bat', 'public/installer/Installer-Basirah-lunettes.bat');
+
+// Application complète avec l'interface Basirah (basirah-ui.html) + moteur Basirah (pont) : public/app.html
+{
+  const bjs = execFileSync(ES, ['app/legacy/bridge.ts', '--bundle', '--format=iife', '--target=es2020', '--minify'], { maxBuffer: 1 << 26 }).toString();
+  const ui = readFileSync('app/legacy/basirah-ui.html', 'utf8'), i = ui.lastIndexOf('</body>');
+  const out = ui.slice(0, i) + '<script>' + bjs.replace(/<\/script/g, '<\\/script') + '</script>\n' + ui.slice(i);
+  writeFileSync('public/app.html', out); console.log('public/app.html', (out.length / 1e6).toFixed(2), 'Mo');
+}
