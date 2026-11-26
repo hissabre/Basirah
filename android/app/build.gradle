@@ -34,6 +34,24 @@ android {
     }
   }
 
+  // Deux applications depuis le même code : lunettes (paysage, anneau) et téléphone (tactile, boutons à l'écran).
+  flavorDimensions = ['device']
+  productFlavors {
+    glasses {
+      dimension 'device'
+      manifestPlaceholders = [orientation: 'landscape']
+      resValue 'string', 'app_name', 'Basirah'
+      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/glasses.html?glasses=1'
+    }
+    phone {
+      dimension 'device'
+      applicationIdSuffix '.phone'
+      manifestPlaceholders = [orientation: 'unspecified']
+      resValue 'string', 'app_name', 'Basirah (téléphone)'
+      resValue 'string', 'start_url', 'https://appassets.androidplatform.net/assets/www/glasses.html?phone=1'
+    }
+  }
+
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_17
     targetCompatibility JavaVersion.VERSION_17

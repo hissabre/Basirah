@@ -3,36 +3,42 @@
 <meta name="theme-color" content="#000000"><title>Basirah</title>
 <style>
 /* Lunettes : noir = transparent. Texte clair, gros, peu d'éléments. Conçu pour 640×400, s'adapte à tout écran. */
-:root{--fg:#fff;--k:1;--dim:1;--acc:#7dffa8;--warn:#ffb36b;color-scheme:dark}
+:root{--u:min(1vh,1vw);--fg:#fff;--k:1;--dim:1;--acc:#7dffa8;--warn:#ffb36b;color-scheme:dark}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#000;color:var(--fg);overflow:hidden;-webkit-user-select:none;user-select:none;cursor:default}
-body{font:calc(4.6vh*var(--k))/1.35 system-ui,"Noto Sans",Roboto,sans-serif;opacity:var(--dim)}
-#app{position:fixed;inset:0;padding:5vh 5vw;display:flex;flex-direction:column;gap:2vh}
-.brand{font-size:9vh;font-weight:700;display:flex;align-items:baseline;gap:3vw;line-height:1.1}.brand span{font-size:5vh;font-weight:500;opacity:.7}
-.title{font-size:6vh;font-weight:700;opacity:.9}
-.menu{list-style:none;display:flex;flex-direction:column;gap:1.2vh}
-.menu li{display:flex;justify-content:space-between;gap:3vw;padding:1.4vh 3vw;border-radius:2vh;border:.4vh solid transparent;font-size:calc(5.4vh*var(--k))}
+body{font:calc(calc(4.6*var(--u))*var(--k))/1.35 system-ui,"Noto Sans",Roboto,sans-serif;opacity:var(--dim)}
+#app{position:fixed;inset:0;padding:calc(5*var(--u)) 5vw;display:flex;flex-direction:column;gap:calc(2*var(--u))}
+.brand{font-size:calc(9*var(--u));font-weight:700;display:flex;align-items:baseline;gap:3vw;line-height:1.1}.brand span{font-size:calc(5*var(--u));font-weight:500;opacity:.7}
+.title{font-size:calc(6*var(--u));font-weight:700;opacity:.9}
+.menu{list-style:none;display:flex;flex-direction:column;gap:calc(1.2*var(--u))}
+.menu li{display:flex;justify-content:space-between;gap:3vw;padding:calc(1.4*var(--u)) 3vw;border-radius:calc(2*var(--u));border:.4vh solid transparent;font-size:calc(calc(5.4*var(--u))*var(--k))}
 .menu li.sel{border-color:var(--fg);background:rgba(255,255,255,.10)}
 .menu li b{font-weight:600;opacity:.85;white-space:nowrap}
-.foot{margin-top:auto;font-size:3.6vh;opacity:.65}.foot small{opacity:.8}
-.plain{list-style:none;display:flex;flex-direction:column;gap:1.6vh;font-size:4.6vh}
-.ar{font-family:"Noto Naskh Arabic","Amiri","Scheherazade New","Noto Sans Arabic",serif;direction:rtl;text-align:right;font-size:calc(8.2vh*var(--k));line-height:1.65}
-.ar.small{font-size:calc(5.6vh*var(--k))}
-.ar span{padding:0 .6vh;border-radius:1.2vh}
+.foot{margin-top:auto;font-size:calc(3.6*var(--u));opacity:.65}.foot small{opacity:.8}
+.plain{list-style:none;display:flex;flex-direction:column;gap:calc(1.6*var(--u));font-size:calc(4.6*var(--u))}
+.ar{font-family:"Noto Naskh Arabic","Amiri","Scheherazade New","Noto Sans Arabic",serif;direction:rtl;text-align:right;font-size:calc(calc(8.2*var(--u))*var(--k));line-height:1.65}
+.ar.small{font-size:calc(calc(5.6*var(--u))*var(--k))}
+.ar span{padding:0 .6vh;border-radius:calc(1.2*var(--u))}
 .ar .done{opacity:.45}.ar .cur{background:var(--fg);color:#000}.ar .prov{outline:.4vh dashed var(--fg)}.ar .todo{opacity:.9}.ar .hid{opacity:.35;letter-spacing:.4vh}
-.dimmed{opacity:.55}.more{font-size:3.4vh;opacity:.6;text-align:center}
+.dimmed{opacity:.55}.more{font-size:calc(3.4*var(--u));opacity:.6;text-align:center}
 .scr-recite .top+.ar,.scr-recite .top+.idle{margin-top:auto}
-.tr{font-size:calc(5.2vh*var(--k));line-height:1.4}
-.top,.bot{display:flex;justify-content:space-between;align-items:center;gap:3vw;font-size:3.8vh;opacity:.8}
-.top .ref b{font-size:4.6vh}.top .mode{opacity:.7}
+.tr{font-size:calc(calc(5.2*var(--u))*var(--k));line-height:1.4}
+.top,.bot{display:flex;justify-content:space-between;align-items:center;gap:3vw;font-size:calc(3.8*var(--u));opacity:.8}
+.top .ref b{font-size:calc(4.6*var(--u))}.top .mode{opacity:.7}
 .bot{margin-top:auto}
-.meter{width:14vw;height:1.4vh;border-radius:1vh;background:rgba(255,255,255,.15);overflow:hidden}.meter .lv{display:block;height:100%;background:var(--acc)}
+.meter{width:14vw;height:calc(1.4*var(--u));border-radius:calc(1*var(--u));background:rgba(255,255,255,.15);overflow:hidden}.meter .lv{display:block;height:100%;background:var(--acc)}
 .ok{color:var(--acc)}.mid{opacity:.8}.warn{color:var(--warn)}
-.hint{font-size:4.4vh;color:var(--acc)}.hint .ar{display:inline;font-size:calc(6.4vh*var(--k))}
-.heard{direction:rtl;font-size:3.4vh;opacity:.5;white-space:nowrap;overflow:hidden;font-family:monospace}
-.idle{margin:auto 0;font-size:5.6vh;opacity:.8;text-align:center}
-.pick{display:flex;flex-direction:column;gap:2.4vh;font-size:5.4vh}.pick>div{padding:1.4vh 3vw;border-radius:2vh;border:.4vh solid transparent}.pick>div.sel{border-color:var(--fg);background:rgba(255,255,255,.10)}
-.pick .ar{display:inline;font-size:6vh;margin-inline-start:2vw}
-</style></head><body><div id="app"></div>
+.hint{font-size:calc(4.4*var(--u));color:var(--acc)}.hint .ar{display:inline;font-size:calc(calc(6.4*var(--u))*var(--k))}
+.heard{direction:rtl;font-size:calc(3.4*var(--u));opacity:.5;white-space:nowrap;overflow:hidden;font-family:monospace}
+.idle{margin:auto 0;font-size:calc(5.6*var(--u));opacity:.8;text-align:center}
+.pick{display:flex;flex-direction:column;gap:calc(2.4*var(--u));font-size:calc(5.4*var(--u))}.pick>div{padding:calc(1.4*var(--u)) 3vw;border-radius:calc(2*var(--u));border:.4vh solid transparent}.pick>div.sel{border-color:var(--fg);background:rgba(255,255,255,.10)}
+.pick .ar{display:inline;font-size:calc(6*var(--u));margin-inline-start:2vw}
+
+/* Téléphone : barre de commandes tactiles (cachée sur les lunettes) */
+#pad{display:none;position:fixed;left:0;right:0;bottom:0;padding:8px max(8px,env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom));gap:8px;background:#000;justify-content:center}
+.touch #pad{display:flex}.touch #app{bottom:72px}
+#pad button{flex:1;max-width:84px;height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:var(--fg);font:22px system-ui}
+#pad button:active{background:rgba(255,255,255,.25)}
+</style></head><body><div id="app"></div><div id="pad"><button data-k="back" aria-label="Retour">↩</button><button data-k="left" aria-label="Gauche">◀</button><button data-k="up" aria-label="Haut">▲</button><button data-k="ok" aria-label="Valider">●</button><button data-k="down" aria-label="Bas">▼</button><button data-k="right" aria-label="Droite">▶</button></div>
 <script>const QURAN=%%QURAN%%;const SURAHS=%%SURAHS%%;const TR=%%TR%%;</script>
 <script>%%CODE%%</script></body></html>

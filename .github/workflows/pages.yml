@@ -39,9 +39,10 @@ jobs:
           mkdir -p android/app/src/main/assets/www
           cp public/glasses.html android/app/src/main/assets/www/
           cp -r public/models public/vendor android/app/src/main/assets/www/
-          gradle -p android assembleRelease --no-daemon -q
-          cp android/app/build/outputs/apk/release/app-release.apk public/basirah-glasses.apk
-          ls -la public/basirah-glasses.apk
+          gradle -p android assembleGlassesRelease assemblePhoneRelease --no-daemon -q
+          cp android/app/build/outputs/apk/glasses/release/app-glasses-release.apk public/basirah-glasses.apk
+          cp android/app/build/outputs/apk/phone/release/app-phone-release.apk public/basirah-phone.apk
+          ls -la public/*.apk
       - uses: actions/upload-pages-artifact@v3
         with: { path: public }
   deploy:

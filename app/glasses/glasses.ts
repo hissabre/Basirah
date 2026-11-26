@@ -187,6 +187,10 @@ let lastKey = '';
 (window as unknown as { basirahKey: (k: string) => void }).basirahKey = (k: string) => { lastKey = k; if (k.startsWith('touche')) { if (screen === 'help') render(); return; } act(k as Parameters<typeof act>[0]); };
 (window as unknown as { basirahBack: () => boolean }).basirahBack = () => { if (screen === 'home') return false; act('back'); return true; };
 // Toucher (pavé tactile en mode souris, téléphone) : glisser = flèches, appui = valider
+// Téléphone : barre de boutons (application téléphone, ou écran tactile hors lunettes)
+const params = new URLSearchParams(location.search);
+if (params.get('phone') === '1' || (params.get('glasses') !== '1' && matchMedia('(pointer: coarse)').matches)) document.body.classList.add('touch');
+document.querySelectorAll<HTMLButtonElement>('#pad button').forEach(b => b.addEventListener('pointerup', e => { e.stopPropagation(); const k = b.dataset.k as Parameters<typeof act>[0]; if (k === 'back' && screen === 'home') return; act(k); }));
 let tx = 0, ty = 0, tt = 0;
 addEventListener('pointerdown', e => { tx = e.clientX; ty = e.clientY; tt = performance.now(); });
 addEventListener('pointerup', e => {

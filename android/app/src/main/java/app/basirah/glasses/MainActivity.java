@@ -52,7 +52,7 @@ public class MainActivity extends Activity {
     });
     if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
       requestPermissions(new String[]{ Manifest.permission.RECORD_AUDIO }, 6);
-    web.loadUrl("https://" + HOST + "/assets/www/glasses.html");
+    web.loadUrl(getString(R.string.start_url));
   }
   private static String mime(String p) {
     p = p.toLowerCase();
