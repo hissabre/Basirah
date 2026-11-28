@@ -71,9 +71,12 @@ public class MainActivity extends Activity {
   /** Anneau / pavé tactile / télécommande : chaque touche devient une commande de la page. Les touches inconnues sont signalées (Aide). */
   @Override public boolean dispatchKeyEvent(KeyEvent e) {
     int k = e.getKeyCode();
-    if (k == KeyEvent.KEYCODE_VOLUME_UP || k == KeyEvent.KEYCODE_VOLUME_DOWN || k == KeyEvent.KEYCODE_POWER) return super.dispatchKeyEvent(e);
+    if (k == KeyEvent.KEYCODE_POWER) return super.dispatchKeyEvent(e);
     String a = null;
     switch (k) {
+      // Volume + : écouter / arrêter ; Volume − : changer de mode (boutons présents sur les lunettes et dans l'émulateur)
+      case KeyEvent.KEYCODE_VOLUME_UP: a = "listen"; break;
+      case KeyEvent.KEYCODE_VOLUME_DOWN: a = "mode"; break;
       case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_PAGE_UP: a = "up"; break;
       case KeyEvent.KEYCODE_DPAD_DOWN: case KeyEvent.KEYCODE_PAGE_DOWN: a = "down"; break;
       case KeyEvent.KEYCODE_DPAD_LEFT: case KeyEvent.KEYCODE_MEDIA_PREVIOUS: a = "left"; break;

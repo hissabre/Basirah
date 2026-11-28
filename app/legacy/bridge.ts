@@ -57,7 +57,7 @@ function load(): Promise<void> {
       } else st(v.live ? 'Recherche de la position…' : 'À l’écoute… récitez');
     });
     await engine.load();
-    syncMode(); st('Moteur Basirah prêt (hors ligne) : appuyez sur Écouter.');
+    syncMode(); st('Moteur Basirah prêt (hors ligne).');
   })();
 }
 function syncMode() { if (session) session.setMode(MODE[document.body.dataset.mode || 'salah'] ?? 'prayer'); }
@@ -77,7 +77,10 @@ async function stop() { on = false; try { await cap.stop(); } catch { /* */ } co
 
 function install() {
   const hudCss = document.createElement('style');
-  hudCss.textContent = 'body.sg #bn,body.sg #wb,body.sg #ts{display:none!important}' + (GLASSES ? 'html:has(body.sg),body.sg{background:#000!important}' : '');
+  hudCss.textContent = 'body.sg #bn,body.sg #wb,body.sg #ts{display:none!important}' + (GLASSES ? 'html:has(body.sg),body.sg{background:#000!important}' : '')
+    + 'body.sg #st{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;height:auto!important;min-height:0!important;padding:0 4vw!important;top:3vh!important;bottom:auto!important;left:0!important;right:0!important;width:auto!important;max-width:none!important;text-align:center!important;transform:none!important}'
+    + 'body.sg #hud .idle{font-size:0!important}body.sg #hud .idle::after{content:var(--idle);display:block;font-size:3vh;line-height:1.6;white-space:pre-line}'
+    + 'body.sg{cursor:pointer}';
   document.head.appendChild(hudCss);
   const wb = $('wb'); if (!wb) { setTimeout(install, 200); return; }
   const orig = wb.onclick as ((this: GlobalEventHandlers, ev: MouseEvent) => unknown) | null;
@@ -112,6 +115,31 @@ function install() {
   }
 }
 
+// ── Commandes communes (lunettes, émulateur Android XR, téléphone) ──
+const MODES_ORDER = ['salah', 'study', 'hifz', 'trad'];
+const MODE_NAME: Record<string, string> = { salah: 'Prière', study: 'Lecture', hifz: 'Hifz', trad: 'Khutbah' };
+function toggleListen() { $('wb')?.click(); }
+function verse(d: number) { $(d > 0 ? 'nx3' : 'pv2')?.click(); }
+function nextMode(d = 1) {
+  const cur = document.body.dataset.mode || 'salah', m = MODES_ORDER[(MODES_ORDER.indexOf(cur) + d + MODES_ORDER.length) % MODES_ORDER.length];
+  (document.querySelector(`#tabs button[data-m="${m}"]`) as HTMLElement | null)?.click(); st('Mode : ' + MODE_NAME[m]); flash('Mode : ' + MODE_NAME[m]);
+}
+let flashT = 0;
+function flash(t: string) { const e = $('st'); if (!e) return; e.textContent = t; clearTimeout(flashT); flashT = window.setTimeout(() => { if (e.textContent === t) e.textContent = ''; }, 1800); }
+// Aide affichée dans l'affichage tête haute quand rien n'est encore reconnu
+function idleHelp() {
+  const listening = $('wb')?.classList.contains('rec');
+  const t = (listening ? 'À l’écoute… récitez, le verset s’affichera ici.\n' : 'Prêt (hors ligne).\n')
+    + 'Cliquer · Entrée · Volume + : ' + (listening ? 'arrêter' : 'écouter') + '\n← → : verset · ↑ ↓ ou Volume − : mode (' + MODE_NAME[document.body.dataset.mode || 'salah'] + ')\nRetour (◁ ou Échap) : menu et réglages';
+  document.body.style.setProperty('--idle', '"' + t.replace(/["\\]/g, '\\$&').replace(/\n/g, '\\A ') + '"');
+}
+setInterval(idleHelp, 500);
+// Clic / toucher dans l'affichage tête haute = écouter / arrêter
+document.addEventListener('click', e => {
+  if (!e.isTrusted || !document.body.classList.contains('sg') || document.getElementById('splash')) return; // clics réels seulement (pas ceux que l'app déclenche elle-même)
+  e.stopPropagation(); e.preventDefault(); toggleListen();
+}, true);
+
 // ── Anneau / pavé tactile / télécommande (lunettes, application Android) ──
 function focusables(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('button, [tabindex="0"], input, select')].filter(e => e.offsetParent !== null && !(e as HTMLButtonElement).disabled && getComputedStyle(e).visibility !== 'hidden');
@@ -123,7 +151,15 @@ function moveFocus(d: number) {
 function key(k: string) {
   const b = document.body, hud = b.classList.contains('sg');
   if ($('splash')) { (window as unknown as { __splashClose?: () => void }).__splashClose?.(); return; }
-  if (hud) { if (k === 'ok') $('wb')?.click(); else if (k === 'back') (window as unknown as { __hud?: (on: number) => void }).__hud?.(0); return; }
+  if (k === 'listen') { toggleListen(); return; }
+  if (k === 'mode') { nextMode(1); return; }
+  if (hud) {
+    if (k === 'ok') toggleListen();
+    else if (k === 'left') verse(-1); else if (k === 'right') verse(1);
+    else if (k === 'up') nextMode(-1); else if (k === 'down') nextMode(1);
+    else if (k === 'back') (window as unknown as { __hud?: (on: number) => void }).__hud?.(0);
+    return;
+  }
   if (k === 'up' || k === 'left') moveFocus(-1);
   else if (k === 'down' || k === 'right') moveFocus(1);
   else if (k === 'ok') (document.activeElement as HTMLElement | null)?.click();
@@ -137,8 +173,12 @@ function key(k: string) {
   if (GLASSES) { (window as unknown as { __hud?: (on: number) => void }).__hud?.(b.classList.contains('sg') ? 0 : 1); return true; }
   return false;
 };
-if (GLASSES) addEventListener('keydown', e => {
-  const m: Record<string, string> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok' };
-  if (m[e.key] && document.body.classList.contains('sg')) { e.preventDefault(); key(m[e.key]); }
+// Clavier (navigateur, émulateur) : mêmes commandes
+addEventListener('keydown', e => {
+  const m: Record<string, string> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok', ' ': 'ok' };
+  if (document.body.classList.contains('sg')) {
+    if (m[e.key]) { e.preventDefault(); key(m[e.key]); }
+    else if (e.key === 'Escape') { e.preventDefault(); (window as unknown as { basirahBack: () => boolean }).basirahBack(); }
+  } else if (GLASSES && e.key === 'Escape' && !document.getElementById('pks')) { (window as unknown as { basirahBack: () => boolean }).basirahBack(); }
 });
 install();
