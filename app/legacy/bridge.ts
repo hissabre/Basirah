@@ -25,7 +25,9 @@ const MODE: Record<string, Mode> = { salah: 'prayer', study: 'reading', hifz: 'h
 
 let q: QuranDB | null = null, session: Session | null = null, engine: QuranCtcEngine | null = null;
 let loadP: Promise<void> | null = null, on = false, ourLast = -1, firstOf = new Map<string, number>();
-const cap = new AudioCapture({ onChunk: (p, t) => { if (on) engine?.pushAudio(p, t); }, onStatus: (s, w) => { if (s === 'interrupted' && on) st('Micro interrompu : ' + w); } });
+// Niveau du micro (pour voir si le son arrive vraiment)
+let micPeak = 0, micChunks = 0, quietSince = 0, lastChunkAt = 0, everHeard = false;
+const cap = new AudioCapture({ onChunk: (p, t) => { let m = 0; for (let i = 0; i < p.length; i += 2) { const a = Math.abs(p[i]); if (a > m) m = a; } micPeak = Math.max(m, micPeak * 0.7); micChunks++; lastChunkAt = performance.now(); if (m > 0.01) everHeard = true; if (on) engine?.pushAudio(p, t); }, onStatus: (s, w) => { if (s === 'interrupted' && on) st('Micro interrompu : ' + w); } });
 
 function waitQuran(): Promise<void> {
   return new Promise(res => { const t = setInterval(() => { try { if (V.length === 6236 && W.length) { clearInterval(t); res(); } } catch { /* pas encore */ } }, 150); });
@@ -62,7 +64,20 @@ function load(): Promise<void> {
 }
 function syncMode() { if (session) session.setMode(MODE[document.body.dataset.mode || 'salah'] ?? 'prayer'); }
 
+function micMeter() {
+  let e = document.getElementById('mlv'); if (!e) { e = document.createElement('div'); e.id = 'mlv'; document.body.appendChild(e); }
+  if (!on) { e.hidden = true; return; } e.hidden = false;
+  const now = performance.now(), bars = '▁▂▃▄▅▆▇█', lv = Math.min(7, Math.floor(Math.sqrt(micPeak) * 9));
+  let msg = '';
+  if (!micChunks || now - lastChunkAt > 2500) msg = 'Micro : aucune donnée reçue';
+  else if (micPeak < 0.003) { if (!quietSince) quietSince = now; if (now - quietSince > 4000) msg = everHeard ? 'Micro : silence' : 'Micro : seulement du silence — le son de l’ordinateur n’arrive pas (voir Aide)'; }
+  else quietSince = 0;
+  e.textContent = '🎤 ' + bars.slice(0, lv + 1).padEnd(8, '·') + (msg ? '  ' + msg : '');
+  e.className = msg ? 'bad' : '';
+}
+setInterval(micMeter, 250);
 async function start() {
+  micChunks = 0; micPeak = 0; quietSince = 0; everHeard = false;
   const wb = $('wb');
   try {
     await load(); syncMode();
@@ -80,7 +95,8 @@ function install() {
   hudCss.textContent = 'body.sg #bn,body.sg #wb,body.sg #ts{display:none!important}' + (GLASSES ? 'html:has(body.sg),body.sg{background:#000!important}' : '')
     + 'body.sg #st{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;height:auto!important;min-height:0!important;padding:0 4vw!important;top:3vh!important;bottom:auto!important;left:0!important;right:0!important;width:auto!important;max-width:none!important;text-align:center!important;transform:none!important}'
     + 'body.sg #hud .idle{font-size:0!important}body.sg #hud .idle::after{content:var(--idle);display:block;font-size:3vh;line-height:1.6;white-space:pre-line}'
-    + 'body.sg{cursor:pointer}';
+    + 'body.sg{cursor:pointer}'
+    + '#mlv{position:fixed;left:0;right:0;bottom:2vh;text-align:center;font:600 2.6vh system-ui;color:#7dffa8;opacity:.85;pointer-events:none;z-index:99}#mlv.bad{color:#ffb36b}body:not(.sg) #mlv{bottom:96px}';
   document.head.appendChild(hudCss);
   const wb = $('wb'); if (!wb) { setTimeout(install, 200); return; }
   const orig = wb.onclick as ((this: GlobalEventHandlers, ev: MouseEvent) => unknown) | null;
